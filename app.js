@@ -32,7 +32,7 @@
         bookId: state.bookId,
         days: Array.from(state.selected),
         meaning: state.want.m, spelling: state.want.s,
-        mode: s.mode, fontSize: s.fontSize, hint: s.hint,
+        mode: s.mode, hint: s.hint,
         title: state.titleEdited ? s.title : ''
       }));
     } catch (e) { /* 저장 불가(사생활 보호 모드 등) — 무시 */ }
@@ -121,7 +121,7 @@
       spelling: toInt($('spellingCount').value),
       mode: radioValue('mode') || 'split',
       columns: 2, // 시험지는 항상 2단
-      fontSize: Number($('fontSize').value) || 14,
+      fontSize: 14, // 글자 크기는 '보통'으로 고정
       hint: $('hint').checked,
       title: $('title').value.trim(),
       date: $('date').value
@@ -412,10 +412,10 @@
     }
 
     var els = [];
-    function secHead(text, desc, later) {
+    function secHead(text, later) {
       var h = document.createElement('div');
       h.className = 'sec-head keep-next' + (later ? ' later' : '');
-      h.innerHTML = esc(text) + (desc ? '<span class="desc">' + esc(desc) + '</span>' : '');
+      h.textContent = text;
       els.push(h);
     }
     function qEl(q) {
@@ -434,18 +434,14 @@
       var hasM = qs.some(function (q) { return q.type === 'meaning'; });
       var hasS = qs.some(function (q) { return q.type === 'spelling'; });
       if (hasM) {
-        secHead('Ⅰ. 뜻 쓰기', '다음 영어 단어의 뜻을 우리말로 쓰시오.');
+        secHead('Ⅰ. 뜻 쓰기');
         qs.forEach(function (q) { if (q.type === 'meaning') qEl(q); });
       }
       if (hasS) {
-        secHead((hasM ? 'Ⅱ' : 'Ⅰ') + '. 스펠링 쓰기', '다음 뜻에 맞는 영어 단어를 쓰시오.', hasM);
+        secHead((hasM ? 'Ⅱ' : 'Ⅰ') + '. 스펠링 쓰기', hasM);
         qs.forEach(function (q) { if (q.type === 'spelling') qEl(q); });
       }
     } else {
-      var both = qs.some(function (q) { return q.type === 'meaning'; }) && qs.some(function (q) { return q.type === 'spelling'; });
-      secHead('다음 물음에 답하시오.',
-        both ? '영어 단어는 우리말 뜻을, 우리말은 영어 단어를 쓰시오.' :
-        qs.length && qs[0].type === 'meaning' ? '영어 단어의 뜻을 우리말로 쓰시오.' : '뜻에 맞는 영어 단어를 쓰시오.');
       qs.forEach(qEl);
     }
 
@@ -571,8 +567,6 @@
     $('meaningCount').value = state.want.m;
     $('spellingCount').value = state.want.s;
     if (sv.mode) { var r = document.querySelector('input[name="mode"][value="' + sv.mode + '"]'); if (r) r.checked = true; }
-    if (sv.fontSize) $('fontSize').value = String(sv.fontSize);
-    if (!$('fontSize').value) $('fontSize').value = '14';
     $('hint').checked = !!sv.hint;
     if (sv.title) { $('title').value = sv.title; state.titleEdited = true; }
   }
@@ -598,7 +592,7 @@
     qsa('[data-quick]').forEach(function (b) {
       b.addEventListener('click', function () { quick(b.getAttribute('data-quick')); });
     });
-    ['fontSize', 'hint', 'date'].forEach(function (id) {
+    ['hint', 'date'].forEach(function (id) {
       $(id).addEventListener('change', function () { update(); });
     });
     $('title').addEventListener('input', function () {
@@ -613,7 +607,9 @@
     qsa('input[name="mode"]').forEach(function (el) {
       el.addEventListener('change', function () { update(); });
     });
-    $('shuffleBtn').addEventListener('click', function () { update(null, true); });
+    ['shuffleBtn', 'shuffleBtn2'].forEach(function (id) {
+      $(id).addEventListener('click', function () { update(null, true); });
+    });
     qsa('[data-print]').forEach(function (b) {
       b.addEventListener('click', function () { doPrint(b.getAttribute('data-print')); });
     });

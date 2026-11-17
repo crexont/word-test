@@ -63,21 +63,16 @@
     </div>
 
     <div class="block">
-      <h2>배치</h2>
-      <div class="opt-row"><span>문항 순서</span>
-        <div class="seg">
-          <label><input type="radio" name="mode" value="split" checked><span>유형별로</span></label>
-          <label><input type="radio" name="mode" value="mix"><span>섞기</span></label>
-        </div>
+      <div class="block-head">
+        <h2>배치</h2>
+        <button type="button" class="btn small shuffle-btn" id="shuffleBtn2">🔀 다시 섞기</button>
       </div>
-      <div class="opt-row"><span>글자 크기</span>
-        <select id="fontSize">
-          <option value="12">아주 작게</option>
-          <option value="13">작게</option>
-          <option value="14" selected>보통</option>
-          <option value="16">크게</option>
-          <option value="18">아주 크게</option>
-        </select>
+      <p class="tiny">문제 순서는 항상 무작위입니다. 다시 섞기를 누르면 새로 섞입니다.</p>
+      <div class="opt-row"><span>뜻·스펠링 배치</span>
+        <div class="seg">
+          <label><input type="radio" name="mode" value="split" checked><span>나눠서</span></label>
+          <label><input type="radio" name="mode" value="mix"><span>섞어서</span></label>
+        </div>
       </div>
       <div class="opt-row"><span>첫 글자 힌트</span>
         <label class="switch"><input type="checkbox" id="hint"><span class="knob"></span><span class="tiny">스펠링 문제</span></label>
@@ -94,7 +89,7 @@
 
   <main class="preview">
     <div class="toolbar">
-      <button type="button" class="btn" id="shuffleBtn">⟳ 다시 섞기</button>
+      <button type="button" class="btn shuffle-btn" id="shuffleBtn">🔀 다시 섞기</button>
       <span class="spacer"></span>
       <button type="button" class="btn primary" data-print="both">시험지+답지 인쇄</button>
       <button type="button" class="btn" data-print="test">시험지만</button>
