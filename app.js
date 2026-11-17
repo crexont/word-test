@@ -119,7 +119,7 @@
       meaning: toInt($('meaningCount').value),
       spelling: toInt($('spellingCount').value),
       mode: radioValue('mode') || 'split',
-      columns: 2, // 시험지는 항상 2단
+      columns: 3, // 시험지는 항상 3단
       fontSize: 14, // 글자 크기는 '보통'으로 고정
       hint: $('hint').checked,
       title: $('title').value.trim(),
@@ -420,7 +420,8 @@
         : '<span class="qp">' + esc(q.w.ko) + '</span>';
       var hint = q.type === 'spelling' && s.hint
         ? '<span class="hint">' + esc(q.w.en.charAt(0)) + '</span>' : '';
-      d.innerHTML = '<span class="qn">' + q.no + '.</span>' + prompt + '<span class="qb">' + hint + '</span>';
+      // 번호 | (문제 + 빈칸) — 줄이 넘어가도 번호 오른쪽에 들여쓰기된 채로 이어진다
+      d.innerHTML = '<span class="qn">' + q.no + '.</span><span class="qc">' + prompt + '<span class="qb">' + hint + '</span></span>';
       els.push(d);
     }
 
