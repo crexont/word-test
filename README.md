@@ -39,6 +39,10 @@
    ]
    ```
 
+   선택 항목:
+   - `"cover": "data/covers/voca-basic.jpg"` — 표지 이미지 (이미지는 `data/covers/`에 넣기, 세로 3:4 비율 권장)
+   - `"color": "#1d5c45"` — 표지 이미지가 없을 때 자동 표지의 색
+
 3. 변경 사항을 커밋하고 push하면 1~2분 뒤 사이트에 반영됩니다.
    (GitHub 웹에서 파일을 직접 고치고 "Commit changes"를 눌러도 됩니다.)
 

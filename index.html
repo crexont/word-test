@@ -7,97 +7,117 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="app">
-  <aside class="panel no-print">
-    <h1 class="app-title">영어 단어 시험지 생성기</h1>
+<header class="top">
+  <h1>영어 단어 시험지 생성기</h1>
+  <p class="sub">교재 → Day → 문항 수만 고르면 오른쪽에 바로 시험지가 만들어집니다.</p>
+</header>
 
-    <section class="step">
-      <h2><span class="step-no">1</span>교재 선택</h2>
-      <div id="bookList" class="book-list"><p class="muted">교재 목록을 불러오는 중…</p></div>
-    </section>
+<section class="books">
+  <div id="bookList" class="book-list"><p class="muted">교재 목록을 불러오는 중…</p></div>
+</section>
 
-    <section class="step" id="daySection" hidden>
-      <h2><span class="step-no">2</span>Day 선택</h2>
-      <div class="row gap">
-        <button type="button" class="btn small" id="selectAll">전체 선택</button>
-        <button type="button" class="btn small" id="selectNone">전체 해제</button>
-        <span class="muted small-text">Shift+클릭: 범위 선택</span>
+<div class="work" id="work" hidden>
+  <aside class="panel">
+    <div class="block">
+      <div class="block-head">
+        <h2>Day 선택 <span class="accent" id="dayCountText"></span></h2>
+        <div class="head-btns">
+          <button type="button" class="btn small" id="selectAll">전체</button>
+          <button type="button" class="btn small" id="selectNone">해제</button>
+        </div>
       </div>
+      <p class="tiny">Shift+클릭으로 범위를 한 번에 선택할 수 있습니다.</p>
       <div id="dayGrid" class="day-grid"></div>
-    </section>
+    </div>
 
-    <section class="step" id="settingSection" hidden>
-      <h2><span class="step-no">3</span>출제 설정</h2>
-      <p class="total-info">선택한 Day의 단어 수: <b id="totalWords">0</b>개 · 출제 <b id="sumCount">0</b>문항</p>
-
-      <div class="grid2">
-        <label class="field">뜻 쓰기 문항 수
+    <div class="block">
+      <div class="block-head">
+        <h2>문항 수</h2>
+        <span class="tiny">선택한 단어 <b class="accent" id="totalWords">0</b>개 · 출제 <b id="sumCount">0</b>문항</span>
+      </div>
+      <div class="count-row">
+        <span class="type-name"><span class="dot d1"></span>뜻 쓰기</span>
+        <div class="stepper" data-target="meaningCount">
+          <button type="button" class="mini" data-act="dec" aria-label="하나 줄이기">−</button>
           <input type="number" id="meaningCount" min="0" value="10" inputmode="numeric">
-        </label>
-        <label class="field">스펠링 쓰기 문항 수
+          <button type="button" class="mini" data-act="inc" aria-label="하나 늘리기">+</button>
+          <button type="button" class="mini wide" data-act="max">최대</button>
+        </div>
+      </div>
+      <div class="count-row">
+        <span class="type-name"><span class="dot d2"></span>스펠링 쓰기</span>
+        <div class="stepper" data-target="spellingCount">
+          <button type="button" class="mini" data-act="dec" aria-label="하나 줄이기">−</button>
           <input type="number" id="spellingCount" min="0" value="10" inputmode="numeric">
-        </label>
+          <button type="button" class="mini" data-act="inc" aria-label="하나 늘리기">+</button>
+          <button type="button" class="mini wide" data-act="max">최대</button>
+        </div>
       </div>
       <p class="warn" id="countWarn" hidden></p>
-      <div class="row gap">
-        <button type="button" class="btn small" data-quick="meaning">전부 뜻</button>
-        <button type="button" class="btn small" data-quick="spelling">전부 스펠링</button>
-        <button type="button" class="btn small" data-quick="half">반반</button>
+      <div class="chips">
+        <button type="button" class="chip" data-quick="meaning">전부 뜻</button>
+        <button type="button" class="chip" data-quick="spelling">전부 스펠링</button>
+        <button type="button" class="chip" data-quick="half">반반</button>
       </div>
-      <p class="muted small-text">빠른 버튼은 현재 문항 수 합계(0이면 전체 단어 수)를 기준으로 나눕니다.</p>
+      <p class="tiny">같은 단어는 뜻·스펠링 중 한 유형에만 나옵니다.</p>
+    </div>
 
-      <div class="field">문항 배치
+    <div class="block">
+      <h2>배치</h2>
+      <div class="opt-row"><span>문항 순서</span>
         <div class="seg">
-          <label><input type="radio" name="mode" value="split" checked> 유형별로 나누기</label>
-          <label><input type="radio" name="mode" value="mix"> 섞기</label>
+          <label><input type="radio" name="mode" value="split" checked><span>유형별로</span></label>
+          <label><input type="radio" name="mode" value="mix"><span>섞기</span></label>
         </div>
       </div>
-      <div class="grid2">
-        <div class="field">단 수
-          <div class="seg">
-            <label><input type="radio" name="columns" value="1"> 1단</label>
-            <label><input type="radio" name="columns" value="2" checked> 2단</label>
-          </div>
+      <div class="opt-row"><span>단</span>
+        <div class="seg">
+          <label><input type="radio" name="columns" value="1"><span>1단</span></label>
+          <label><input type="radio" name="columns" value="2" checked><span>2단</span></label>
         </div>
-        <label class="field">글자 크기
-          <select id="fontSize">
-            <option value="12">아주 작게</option>
-            <option value="13">작게</option>
-            <option value="14" selected>보통</option>
-            <option value="16">크게</option>
-            <option value="18">아주 크게</option>
-          </select>
-        </label>
       </div>
-      <label class="check"><input type="checkbox" id="hint"> 스펠링 문제에 첫 글자 힌트</label>
+      <div class="opt-row"><span>글자 크기</span>
+        <select id="fontSize">
+          <option value="12">아주 작게</option>
+          <option value="13">작게</option>
+          <option value="14" selected>보통</option>
+          <option value="16">크게</option>
+          <option value="18">아주 크게</option>
+        </select>
+      </div>
+      <div class="opt-row"><span>첫 글자 힌트</span>
+        <label class="switch"><input type="checkbox" id="hint"><span class="knob"></span><span class="tiny">스펠링 문제</span></label>
+      </div>
+    </div>
 
-      <label class="field">학원명
-        <input type="text" id="academy" placeholder="예: ○○ 영어학원">
-      </label>
-      <label class="field">시험 제목
-        <input type="text" id="title" placeholder="비우면 자동으로 만들어집니다">
-      </label>
-      <label class="field">날짜
-        <input type="date" id="date">
-      </label>
-    </section>
-
-    <section class="step actions" id="actionSection" hidden>
-      <button type="button" class="btn primary" id="shuffleBtn">다시 섞기</button>
-      <button type="button" class="btn" data-print="both">시험지+답지 인쇄</button>
-      <button type="button" class="btn" data-print="test">시험지만 인쇄</button>
-      <button type="button" class="btn" data-print="answer">답지만 인쇄</button>
-    </section>
+    <div class="block">
+      <h2>시험지 정보</h2>
+      <label class="field">학원명<input type="text" id="academy" placeholder="예: ○○ 영어학원"></label>
+      <label class="field">시험 제목<input type="text" id="title" placeholder="비우면 자동으로 만들어집니다"></label>
+      <label class="field">날짜<input type="date" id="date"></label>
+    </div>
   </aside>
 
-  <main class="preview" id="preview">
-    <div class="empty no-print" id="emptyMsg">
-      <p>왼쪽에서 교재와 Day를 고르면 여기에 A4 시험지 미리보기가 나타납니다.</p>
+  <main class="preview">
+    <div class="toolbar">
+      <button type="button" class="btn" id="shuffleBtn">⟳ 다시 섞기</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn primary" data-print="both">시험지+답지 인쇄</button>
+      <button type="button" class="btn" data-print="test">시험지만</button>
+      <button type="button" class="btn" data-print="answer">답지만</button>
     </div>
-    <div id="testPages" class="pages"></div>
-    <div id="answerPages" class="pages"></div>
+    <p class="empty" id="emptyMsg" hidden></p>
+    <div class="preview-area" id="previewArea">
+      <div class="sizer" id="sizer">
+        <div class="scaler" id="scaler">
+          <div id="testPages" class="pages"></div>
+          <div id="answerPages" class="pages"></div>
+        </div>
+      </div>
+    </div>
   </main>
 </div>
+
 <script src="app.js"></script>
 </body>
 </html>
