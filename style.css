@@ -303,3 +303,16 @@ body.view-prog .books, body.view-prog #work { display: none !important; }
   .page.last-printed { break-after: auto; page-break-after: auto; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* 학생 관리 창 */
+.stu-dlg { border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; width: min(420px, 92vw); background: var(--card); color: var(--text); box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+.stu-dlg::backdrop { background: rgba(0,0,0,.35); }
+.stu-dlg h2 { margin: 0 0 12px; font-size: 16px; }
+.stu-dlg select { border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; background: var(--surface); color: var(--text); font-size: 14px; width: 100%; }
+.stu-dlg .field-row { margin: 0; }
+.stu-dlg .field-row .field { margin-bottom: 9px; }
+.dlg-btns { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+.dlg-btns .spacer { flex: 1; }
+.btn.danger { border-color: var(--warn); color: var(--warn); }
+.ptable .c-act .btn.edit { padding: 3px 7px; }
+@media print { .stu-dlg { display: none !important; } }

@@ -8,7 +8,7 @@
   // 저장된 화면 모드를 먼저 적용해 깜빡임 방지
   try { var t = localStorage.getItem('wordTest.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
 </script>
-<link rel="stylesheet" href="style.css?v=20261118s">
+<link rel="stylesheet" href="style.css?v=20261118t">
 </head>
 <body>
 <div class="layout">
@@ -39,6 +39,11 @@
           <button type="button" class="btn primary" id="sheetConnect">연결</button>
         </div>
         <p class="tiny when-disconnected">주소는 이 컴퓨터의 브라우저에만 저장됩니다. 설정 방법은 README의 "진도표(구글 시트) 연결"을 보세요.</p>
+        <div class="field-row when-disconnected">
+          <label class="field grow">관리 키 (학생 추가·수정·삭제용, 없으면 비워 두세요)
+            <input type="password" id="adminKey" autocomplete="off" spellcheck="false">
+          </label>
+        </div>
       </div>
 
       <div class="prog-grid">
@@ -82,6 +87,7 @@
           <div class="block-head">
             <h2>학생 <span class="accent" id="progCount"></span></h2>
             <div class="head-btns">
+              <button type="button" class="btn small admin-only" id="stuAdd" hidden>＋ 학생 추가</button>
               <button type="button" class="btn small" id="progRefresh">↻ 새로고침</button>
               <button type="button" class="btn small" id="progNone">선택 해제</button>
             </div>
@@ -182,6 +188,32 @@
   </main>
 </div>
 
-<script src="app.js?v=20261118s"></script>
+<dialog id="stuDlg" class="stu-dlg">
+  <form method="dialog" id="stuForm">
+    <h2 id="stuDlgTitle">학생 추가</h2>
+    <div class="field-row">
+      <label class="field" style="width:90px">학년
+        <input type="text" id="stuGrade" list="gradeOptions" placeholder="예: 중3" autocomplete="off">
+      </label>
+      <label class="field grow">교재
+        <select id="stuBook"></select>
+      </label>
+    </div>
+    <label class="field">이름<input type="text" id="stuName" autocomplete="off"></label>
+    <label class="field">비고<input type="text" id="stuNote" autocomplete="off"></label>
+    <p class="warn" id="stuErr" hidden></p>
+    <div class="dlg-btns">
+      <button type="button" class="btn danger" id="stuDelete" hidden>삭제</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" id="stuCancel">취소</button>
+      <button type="submit" class="btn primary" id="stuSave">저장</button>
+    </div>
+  </form>
+</dialog>
+<datalist id="gradeOptions">
+  <option value="중1"><option value="중2"><option value="중3"><option value="고1"><option value="고2"><option value="고3">
+</datalist>
+
+<script src="app.js?v=20261118t"></script>
 </body>
 </html>

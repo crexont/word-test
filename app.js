@@ -756,6 +756,8 @@
     if (!/^https?:\/\//.test(url)) { setStatus('주소를 확인하세요 (https://script.google.com/... 로 시작).', 'err'); return; }
     prog.url = url;
     lsSet(SHEET_KEY, url);
+    prog.adminKey = $('adminKey').value.trim();
+    lsSet('wordTest.adminKey', prog.adminKey);
     loadSheet();
   }
 
@@ -831,6 +833,8 @@
       .sort(function (a, b) { return gidx(a.g.grade) - gidx(b.g.grade) || a.i - b.i; })
       .map(function (x) { return x.g; });
     var canWrite = prog.version >= 3;
+    var canAdmin = prog.version >= 4 && !!prog.adminKey;
+    $('stuAdd').hidden = !canAdmin;
     var html = '';
     groups.forEach(function (g, gi) {
       var info0 = studentInfo(g.rows[0]);
@@ -859,6 +863,7 @@
           '<td class="c-act">' +
             '<button type="button" class="btn small pass" data-pass="' + row.r + '"' + (st.book && st.next && canWrite ? '' : ' disabled') + ' title="' + (st.next ? 'Day ' + esc(st.next.label) + ' 통과로 오늘 날짜 기록' : '') + '">통과 ✓</button>' +
             '<button type="button" class="btn small undo" data-undo="' + row.r + '"' + (st.last && canWrite ? '' : ' disabled') + ' title="마지막 통과 기록 지우기">↶</button>' +
+            (canAdmin ? '<button type="button" class="btn small edit" data-edit="' + row.r + '" title="학생 정보 수정·삭제">✎</button>' : '') +
           '</td></tr>';
       });
       html += '</tbody></table></div>';
@@ -896,6 +901,9 @@
     });
     qsa('#progTable [data-pass]').forEach(function (b) {
       b.addEventListener('click', function () { markPass(+b.getAttribute('data-pass'), false); });
+    });
+    qsa('#progTable [data-edit]').forEach(function (b) {
+      b.addEventListener('click', function () { openStudent(prog.data.rows.find(function (x) { return x.r === +b.getAttribute('data-edit'); })); });
     });
     qsa('#progTable [data-undo]').forEach(function (b) {
       b.addEventListener('click', function () { markPass(+b.getAttribute('data-undo'), true); });
@@ -997,6 +1005,69 @@
     });
   }
 
+  // ---------- 학생 관리 (관리 키 필요) ----------
+  var editing = null; // 수정 중인 학생 줄 (추가면 null)
+  function maxDaysMap() {
+    var m = {};
+    state.books.forEach(function (b) { if (b.maxDay) { m[b.short || b.title] = b.maxDay; m[b.title] = b.maxDay; } });
+    return m;
+  }
+  function openStudent(row) {
+    editing = row || null;
+    var sel = $('stuBook');
+    sel.innerHTML = state.books.map(function (b) {
+      var v = b.short || b.title;
+      return '<option value="' + esc(v) + '">' + esc(v) + ' — ' + esc(b.title) + '</option>';
+    }).join('');
+    $('stuDlgTitle').textContent = row ? '학생 정보 수정' : '학생 추가';
+    var fg = prog.grade || (prog.data && prog.data.rows.length ? prog.data.rows[prog.data.rows.length - 1].grade : '');
+    $('stuGrade').value = row ? row.grade : fg;
+    var b = row ? matchBook(row.book) : null;
+    sel.value = b ? (b.short || b.title) : (row ? row.book : sel.value);
+    if (row && !b) sel.insertAdjacentHTML('afterbegin', '<option value="' + esc(row.book) + '" selected>' + esc(row.book) + '</option>');
+    $('stuName').value = row ? row.name : '';
+    $('stuNote').value = row ? row.note : '';
+    $('stuDelete').hidden = !row;
+    $('stuErr').hidden = true;
+    $('stuDlg').showModal();
+    $(row ? 'stuName' : 'stuName').focus();
+  }
+  function stuBusy(on, msg) {
+    ['stuSave', 'stuDelete', 'stuCancel'].forEach(function (id) { $(id).disabled = on; });
+    if (msg) { $('stuErr').textContent = msg; $('stuErr').hidden = false; }
+  }
+  function adminCall(body) {
+    body.key = prog.adminKey;
+    body.maxDays = maxDaysMap();
+    return api('POST', body);
+  }
+  function saveStudent() {
+    var grade = $('stuGrade').value.trim(), book = $('stuBook').value, name = $('stuName').value.trim(), note = $('stuNote').value.trim();
+    if (!name) { stuBusy(false, '이름을 적어 주세요.'); return; }
+    stuBusy(true);
+    var req = editing
+      ? { action: 'updateStudent', r: editing.r, name: editing.name, set: { grade: grade, book: book, name: name, note: note } }
+      : { action: 'addStudent', grade: grade, book: book, name: name, note: note };
+    setStatus((editing ? '수정하는 중… ' : '추가하는 중… ') + name);
+    adminCall(req).then(function () {
+      $('stuDlg').close();
+      setStatus((editing ? '수정함: ' : '추가함: ') + name, 'ok');
+      loadSheet();
+    }).catch(function (err) { stuBusy(false, err.message); }).then(function () { stuBusy(false); });
+  }
+  function deleteStudent() {
+    if (!editing) return;
+    if (!confirm(editing.name + ' 학생을 진도표에서 삭제할까요? 그 학생의 통과 기록도 함께 지워집니다.')) return;
+    stuBusy(true);
+    var name = editing.name;
+    adminCall({ action: 'deleteStudent', r: editing.r, name: name }).then(function () {
+      prog.selected.delete(editing.r);
+      $('stuDlg').close();
+      setStatus('삭제함: ' + name, 'ok');
+      loadSheet();
+    }).catch(function (err) { stuBusy(false, err.message); }).then(function () { stuBusy(false); });
+  }
+
   function setView(v) {
     view = v === 'prog' ? 'prog' : 'gen';
     lsSet(VIEW_KEY, view);
@@ -1040,6 +1111,12 @@
     });
     prog.url = lsGet(SHEET_KEY);
     prog.grade = lsGet('wordTest.grade');
+    prog.adminKey = lsGet('wordTest.adminKey');
+    $('adminKey').value = prog.adminKey;
+    $('stuAdd').addEventListener('click', function () { openStudent(null); });
+    $('stuForm').addEventListener('submit', function (e) { e.preventDefault(); saveStudent(); });
+    $('stuCancel').addEventListener('click', function () { $('stuDlg').close(); });
+    $('stuDelete').addEventListener('click', deleteStudent);
     $('sheetUrl').value = prog.url;
   }
   window.addEventListener('afterprint', function () {
