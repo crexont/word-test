@@ -1,3 +1,4 @@
 [
-  { "id": "wordmaster-2000", "title": "워드마스터 수능 2000", "short": "수능2000", "file": "data/wordmaster-2000.json", "cover": "data/covers/wordmaster-2000.jpg" }
+  { "id": "wordmaster-2000", "title": "워드마스터 수능 2000", "short": "수능2000", "file": "data/wordmaster-2000.json", "cover": "data/covers/wordmaster-2000.jpg" },
+  { "id": "neungyule-suneung", "title": "능률VOCA 수능 필수", "short": "능률 수능필수", "file": "data/neungyule-suneung.json", "cover": "data/covers/neungyule-suneung.jpg" }
 ]
