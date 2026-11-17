@@ -412,12 +412,6 @@
     }
 
     var els = [];
-    function secHead(text, later) {
-      var h = document.createElement('div');
-      h.className = 'sec-head keep-next' + (later ? ' later' : '');
-      h.textContent = text;
-      els.push(h);
-    }
     function qEl(q) {
       var d = document.createElement('div');
       d.className = 'q';
@@ -430,20 +424,8 @@
       els.push(d);
     }
 
-    if (s.mode === 'split') {
-      var hasM = qs.some(function (q) { return q.type === 'meaning'; });
-      var hasS = qs.some(function (q) { return q.type === 'spelling'; });
-      if (hasM) {
-        secHead('Ⅰ. 뜻 쓰기');
-        qs.forEach(function (q) { if (q.type === 'meaning') qEl(q); });
-      }
-      if (hasS) {
-        secHead((hasM ? 'Ⅱ' : 'Ⅰ') + '. 스펠링 쓰기', hasM);
-        qs.forEach(function (q) { if (q.type === 'spelling') qEl(q); });
-      }
-    } else {
-      qs.forEach(qEl);
-    }
+    // 소제목 없이 문항만 (나눠서: 뜻 문항 → 스펠링 문항 순서)
+    qs.forEach(qEl);
 
     finishFooters(paginate(container, makePage, els), '');
   }
