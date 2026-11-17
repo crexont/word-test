@@ -55,8 +55,8 @@ button, input, select { font: inherit; color: inherit; }
 
 /* 교재 표지 */
 .books { padding: 14px 28px 18px; }
-.book-list { display: flex; gap: 16px; overflow-x: auto; padding: 4px 4px 8px; }
-.book-card { flex: none; width: 112px; background: none; border: 0; padding: 0; cursor: pointer; text-align: center; }
+.book-list { display: flex; align-items: flex-start; gap: 16px; overflow-x: auto; padding: 4px 4px 8px; }
+.book-card { flex: none; width: 112px; background: none; border: 0; padding: 0; cursor: pointer; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; color: var(--text); }
 .cover {
   width: 112px; height: 148px; border-radius: 6px; overflow: hidden; position: relative;
   box-shadow: 0 1px 3px rgba(0,0,0,.15); transition: transform .12s, box-shadow .12s;
