@@ -83,9 +83,10 @@ button, input, select { font: inherit; color: inherit; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) clamp(360px, 31vw, 560px); min-height: 100vh; }
 .left { min-width: 0; }
 .work {
-  display: grid; gap: 12px; padding: 0 24px 12px; align-items: start;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-areas: "day count opts";
+  display: grid; gap: 10px; padding: 0 24px 8px; align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas: "day day" "count opts";
+  align-items: stretch;
 }
 .col-day { grid-area: day; }
 .col-count { grid-area: count; }
@@ -222,9 +223,6 @@ button, input, select { font: inherit; color: inherit; }
 .a-sec { font-size: 11px; font-weight: 700; padding: 1mm 0 1.5mm; }
 
 /* ===== 좁은 화면 ===== */
-@media (max-width: 1500px) {
-  .work { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); grid-template-areas: "day count" "day opts"; }
-}
 @media (max-width: 960px) {
   .layout { display: block; }
   .top, .books { padding-left: 16px; padding-right: 16px; }
