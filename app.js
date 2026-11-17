@@ -674,6 +674,7 @@
 
   function init() {
     var sv = loadSaved();
+    qsa('.toolbar button').forEach(function (b) { b.disabled = true; }); // 교재를 고르기 전에는 비활성
     applySaved(sv);
     $('date').value = todayStr();
     bind();
