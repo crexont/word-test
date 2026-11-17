@@ -118,7 +118,7 @@
     return {
       meaning: toInt($('meaningCount').value),
       spelling: toInt($('spellingCount').value),
-      mode: radioValue('mode') || 'split',
+      mode: radioValue('mode') || 'byday',
       columns: 3, // 시험지는 항상 3단
       fontSize: 14, // 글자 크기는 '보통'으로 고정
       hint: $('hint').checked,
@@ -277,10 +277,18 @@
     var key = [state.bookId, selectedDaysSorted().join(','), s.meaning, s.spelling, s.mode].join('|');
     if (!force && key === state.questionKey && state.questions) return state.questions;
     var pool = shuffle(wordPool());
-    // 앞쪽은 뜻 쓰기, 그다음은 스펠링 쓰기 → 같은 단어가 두 유형에 중복되지 않음
+    // 섞은 목록의 앞쪽은 뜻 쓰기, 그다음은 스펠링 쓰기 → 같은 단어가 두 유형에 중복되지 않음
     var meaning = pool.slice(0, s.meaning).map(function (w) { return { type: 'meaning', w: w }; });
     var spelling = pool.slice(s.meaning, s.meaning + s.spelling).map(function (w) { return { type: 'spelling', w: w }; });
-    var qs = s.mode === 'mix' ? shuffle(meaning.concat(spelling)) : meaning.concat(spelling);
+    var qs = shuffle(meaning.concat(spelling)); // Day 구분 없이 무작위
+    if (s.mode === 'byday') {
+      // Day별로 무작위: Day 순서대로 묶고, 같은 Day 안에서는 섞인 순서 유지
+      var order = {};
+      state.book.days.forEach(function (d, i) { order[d.day] = i; });
+      qs = qs.map(function (q, i) { return { q: q, i: i }; })
+        .sort(function (a, b) { return (order[a.q.w.day] - order[b.q.w.day]) || (a.i - b.i); })
+        .map(function (x) { return x.q; });
+    }
     qs.forEach(function (q, i) { q.no = i + 1; });
     state.questions = qs;
     state.questionKey = key;
@@ -454,6 +462,7 @@
     }
 
     var els = [];
+    var bothTypes = qs.some(function (q) { return q.type === 'meaning'; }) && qs.some(function (q) { return q.type === 'spelling'; });
     function secHead(text) {
       var h = document.createElement('div');
       h.className = 'a-sec keep-next';
@@ -466,19 +475,17 @@
       var body = q.type === 'meaning'
         ? esc(q.w.en) + ' — <span class="aw">' + esc(q.w.ko) + '</span>'
         : '<span class="aw">' + esc(q.w.en) + '</span> — ' + esc(q.w.ko);
-      var tag = s.mode === 'mix' ? '<span class="ty">' + (q.type === 'meaning' ? '뜻' : '철자') + '</span>' : '';
+      var tag = bothTypes ? '<span class="ty">' + (q.type === 'meaning' ? '뜻' : '철자') + '</span>' : '';
       d.innerHTML = '<span class="an">' + q.no + '.</span><span>' + tag + body + '</span>';
       els.push(d);
     }
 
-    if (s.mode === 'split') {
-      var m = qs.filter(function (q) { return q.type === 'meaning'; });
-      var sp = qs.filter(function (q) { return q.type === 'spelling'; });
-      if (m.length) { secHead('Ⅰ. 뜻 쓰기'); m.forEach(aEl); }
-      if (sp.length) { secHead((m.length ? 'Ⅱ' : 'Ⅰ') + '. 스펠링 쓰기'); sp.forEach(aEl); }
-    } else {
-      qs.forEach(aEl);
-    }
+    // Day별로 출제했으면 답지에 Day 구분을 넣어 채점하기 쉽게
+    var lastDay = null;
+    qs.forEach(function (q) {
+      if (s.mode === 'byday' && q.w.day !== lastDay) { secHead('Day ' + q.w.day); lastDay = q.w.day; }
+      aEl(q);
+    });
 
     finishFooters(paginate(container, makePage, els), '답지');
   }

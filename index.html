@@ -72,13 +72,11 @@
         <h2>배치</h2>
         <button type="button" class="btn small shuffle-btn" id="shuffleBtn2">🔀 다시 섞기</button>
       </div>
-      <p class="tiny">문제 순서는 항상 무작위입니다. 다시 섞기를 누르면 새로 섞입니다.</p>
-      <div class="opt-row"><span>뜻·스펠링 배치</span>
-        <div class="seg">
-          <label><input type="radio" name="mode" value="split" checked><span>나눠서</span></label>
-          <label><input type="radio" name="mode" value="mix"><span>섞어서</span></label>
-        </div>
+      <div class="seg seg-full">
+        <label><input type="radio" name="mode" value="byday" checked><span>Day별로 무작위</span></label>
+        <label><input type="radio" name="mode" value="random"><span>Day 구분 없이 무작위</span></label>
       </div>
+      <p class="tiny">뜻·스펠링 문제는 섞여서 나옵니다. 다시 섞기를 누르면 순서가 새로 바뀝니다.</p>
       <div class="opt-row"><span>첫 글자 힌트</span>
         <label class="switch"><input type="checkbox" id="hint"><span class="knob"></span><span class="tiny">스펠링 문제</span></label>
       </div>
