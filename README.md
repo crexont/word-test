@@ -1,0 +1,64 @@
+# 영어 단어 시험지 생성기
+
+교재와 Day를 고르면 뜻 쓰기 / 스펠링 쓰기 단어 시험지와 답지를 A4로 만들어 인쇄하는 정적 웹사이트입니다.
+서버·DB·빌드 도구 없이 GitHub Pages에서 바로 동작합니다.
+
+- 사이트 주소: https://crexont.github.io/word-test/
+
+## 파일 구성
+
+| 파일 | 역할 |
+|---|---|
+| `index.html`, `style.css`, `app.js` | 화면과 동작 |
+| `data/books.json` | 교재 목록 |
+| `data/<교재id>.json` | 교재별 Day·단어 데이터 |
+
+## 교재 추가하기
+
+1. `data/` 폴더에 새 교재 파일을 만듭니다. 예: `data/voca-basic.json`
+
+   ```json
+   {
+     "title": "기본 영단어",
+     "days": [
+       { "day": 1, "words": [["abandon", "버리다, 포기하다"], ["ability", "능력"]] },
+       { "day": 2, "words": [["benefit", "이익, 혜택"]] }
+     ]
+   }
+   ```
+
+   - `words`의 각 항목은 `["영어 단어", "우리말 뜻"]` 순서입니다.
+   - 파일은 UTF-8로 저장하세요.
+
+2. `data/books.json`에 한 줄을 추가합니다. (`id`는 영문·숫자·하이픈 권장)
+
+   ```json
+   [
+     { "id": "sample", "title": "예시 단어장", "file": "data/sample.json" },
+     { "id": "voca-basic", "title": "기본 영단어", "file": "data/voca-basic.json" }
+   ]
+   ```
+
+3. 변경 사항을 커밋하고 push하면 1~2분 뒤 사이트에 반영됩니다.
+   (GitHub 웹에서 파일을 직접 고치고 "Commit changes"를 눌러도 됩니다.)
+
+## 단어 추가·수정하기
+
+해당 교재의 `data/<교재id>.json`에서 Day의 `words` 목록에 `["단어", "뜻"]`을 추가하거나 고치면 됩니다.
+새 Day는 `days` 목록에 `{ "day": 번호, "words": [...] }`를 추가합니다.
+
+## 로컬에서 확인하기
+
+`index.html`을 더블클릭하면 데이터 파일을 못 읽으므로 로컬 서버로 여세요.
+
+```bash
+python -m http.server 8765
+```
+
+브라우저에서 http://localhost:8765 에 접속합니다.
+
+## 참고
+
+- 같은 영어 단어가 여러 Day에 있으면 한 번만 출제 대상에 포함됩니다.
+- 마지막 설정(교재, Day, 문항 수, 옵션, 학원명)은 브라우저에 저장됩니다. 날짜는 항상 오늘로 시작합니다.
+- 인쇄할 때 브라우저 인쇄 창에서 용지는 A4, 여백은 "기본값" 또는 "없음", 배율은 100%로 두세요.

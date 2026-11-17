@@ -1,0 +1,41 @@
+{
+  "title": "예시 단어장",
+  "days": [
+    { "day": 1, "words": [
+      ["abandon", "버리다, 포기하다"],
+      ["ability", "능력"],
+      ["absorb", "흡수하다"],
+      ["accept", "받아들이다"],
+      ["accurate", "정확한"],
+      ["achieve", "성취하다, 이루다"],
+      ["acquire", "얻다, 습득하다"],
+      ["adapt", "적응하다"],
+      ["admire", "존경하다, 감탄하다"],
+      ["advantage", "이점, 장점"]
+    ]},
+    { "day": 2, "words": [
+      ["benefit", "이익, 혜택"],
+      ["brief", "짧은, 간단한"],
+      ["capable", "~할 수 있는, 유능한"],
+      ["cease", "그만두다, 멈추다"],
+      ["challenge", "도전; 도전하다"],
+      ["compare", "비교하다"],
+      ["consider", "고려하다, 여기다"],
+      ["contribute", "기여하다, 공헌하다"],
+      ["convince", "확신시키다, 설득하다"],
+      ["decline", "감소하다; 거절하다"]
+    ]},
+    { "day": 3, "words": [
+      ["deny", "부인하다, 거부하다"],
+      ["efficient", "효율적인"],
+      ["emerge", "나타나다, 드러나다"],
+      ["encourage", "격려하다, 장려하다"],
+      ["essential", "필수적인, 본질적인"],
+      ["evaluate", "평가하다"],
+      ["frequent", "빈번한, 잦은"],
+      ["generous", "관대한, 너그러운"],
+      ["give up", "포기하다"],
+      ["habitat", "서식지"]
+    ]}
+  ]
+}
