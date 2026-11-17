@@ -31,7 +31,7 @@
         bookId: state.bookId,
         days: Array.from(state.selected),
         meaning: state.want.m, spelling: state.want.s,
-        mode: s.mode, columns: s.columns, fontSize: s.fontSize, hint: s.hint,
+        mode: s.mode, fontSize: s.fontSize, hint: s.hint,
         academy: s.academy, title: s.title
       }));
     } catch (e) { /* 저장 불가(사생활 보호 모드 등) — 무시 */ }
@@ -119,7 +119,7 @@
       meaning: toInt($('meaningCount').value),
       spelling: toInt($('spellingCount').value),
       mode: radioValue('mode') || 'split',
-      columns: Number(radioValue('columns') || 2),
+      columns: 2, // 시험지는 항상 2단
       fontSize: Number($('fontSize').value) || 14,
       hint: $('hint').checked,
       academy: $('academy').value.trim(),
@@ -564,7 +564,6 @@
     $('meaningCount').value = state.want.m;
     $('spellingCount').value = state.want.s;
     if (sv.mode) { var r = document.querySelector('input[name="mode"][value="' + sv.mode + '"]'); if (r) r.checked = true; }
-    if (sv.columns) { var c = document.querySelector('input[name="columns"][value="' + sv.columns + '"]'); if (c) c.checked = true; }
     if (sv.fontSize) $('fontSize').value = String(sv.fontSize);
     if (!$('fontSize').value) $('fontSize').value = '14';
     $('hint').checked = !!sv.hint;
@@ -599,7 +598,7 @@
     ['academy', 'title'].forEach(function (id) {
       $(id).addEventListener('input', function () { update(); });
     });
-    qsa('input[name="mode"], input[name="columns"]').forEach(function (el) {
+    qsa('input[name="mode"]').forEach(function (el) {
       el.addEventListener('change', function () { update(); });
     });
     $('shuffleBtn').addEventListener('click', function () { update(null, true); });
