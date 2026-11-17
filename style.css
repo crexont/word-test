@@ -98,6 +98,8 @@ body.view-prog .books, body.view-prog #work { display: none !important; }
 .grade-chips:empty { display: none; }
 .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .chip small { opacity: .7; margin-left: 2px; }
+.ptable .round { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 5px; font-size: 11px; font-weight: 700; background: #fff1d6; color: #a05a00; }
+:root[data-theme="dark"] .ptable .round { background: #3d2e12; color: #f5c46b; }
 .grade-tag { display: inline-block; background: var(--accent-soft); color: var(--accent); border-radius: 5px; padding: 0 6px; margin-right: 6px; font-size: 12px; }
 .btn.pass { border-color: var(--green); color: var(--green); font-weight: 600; }
 .btn.pass:hover { background: rgba(31,157,111,.1); }

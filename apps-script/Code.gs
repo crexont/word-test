@@ -5,6 +5,7 @@
  *   학년 | 교재 | 이름 | 1 | 2 | 3 | ... | 비고      (학년 칸은 없어도 됩니다)
  *   - '학년'·'교재' 칸은 병합해도 됩니다 (위 칸의 값을 이어서 씁니다).
  *   - Day 칸(1, 2, 3 ... 또는 1-2, 3-4 ...)에 통과 날짜를 적습니다. 빈칸 = 아직 통과 전.
+ *   - 회독: 같은 칸에 날짜를 쉼표로 이어 적습니다 (예: 11/18, 2/3 → 2회 통과).
  *   - 머리글이 두 줄이면(위: '이름', 아래: '1-2' ...) 자동으로 합쳐 읽습니다.
  *
  * 설치: README의 "진도표(구글 시트) 연결" 순서를 따르세요.
@@ -12,6 +13,9 @@
 
 // 진도표가 있는 시트(탭) 이름. 비워 두면 첫 번째 시트를 씁니다.
 var SHEET_NAME = '';
+
+// 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기)
+var VERSION = 3;
 
 var UNIT_RE = /^\d+\s*[-~]\s*\d+$|^\d+$/;
 
@@ -83,10 +87,11 @@ function list_() {
     L.units.forEach(function (u) { cells[u.label] = String(row[u.col] || '').trim(); });
     rows.push({ r: r + 1, grade: grade, book: book, name: name, note: L.iNote >= 0 ? String(row[L.iNote] || '').trim() : '', cells: cells });
   }
-  return { ok: true, sheet: sh.getName(), units: L.units.map(function (u) { return u.label; }), rows: rows };
+  return { ok: true, version: VERSION, sheet: sh.getName(), units: L.units.map(function (u) { return u.label; }), rows: rows };
 }
 
-// req: { r: 행 번호(1-base), name: 학생 이름(확인용), unit: '7-8', clear: true면 지우기 }
+// req: { r: 행 번호(1-base), name: 학생 이름(확인용), unit: '7', clear: true면 마지막 날짜 하나 지우기 }
+// 통과: 칸에 오늘 날짜를 쉼표로 이어 적는다 (회독 기록 유지)
 function set_(req) {
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -102,14 +107,17 @@ function set_(req) {
     var u = L.units.filter(function (x) { return x.label === norm_(req.unit); })[0];
     if (!u) throw new Error('범위 열을 찾지 못했습니다: ' + req.unit);
     var cell = sh.getRange(r, u.col + 1);
-    var value = '';
+    var parts = String(values[r - 1][u.col] || '').split(/[,\n]/).map(function (s) { return s.trim(); }).filter(String);
+    var date = '';
     if (req.clear) {
-      cell.clearContent();
+      parts.pop();
     } else {
-      value = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'M/d');
-      cell.setNumberFormat('@').setValue(value);
+      date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'M/d');
+      parts.push(date);
     }
-    return { ok: true, value: value };
+    var value = parts.join(', ');
+    if (value) cell.setNumberFormat('@').setValue(value); else cell.clearContent();
+    return { ok: true, value: value, date: date };
   } finally {
     lock.releaseLock();
   }

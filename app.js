@@ -687,34 +687,46 @@
     return { a: a, b: b, label: a === b ? String(a) : a + '-' + b, units: list.map(function (u) { return u.label; }) };
   }
 
-  // 학생 한 줄의 상태: 교재, 다음 시험 범위(첫 빈칸부터 '칸 수'만큼, 이어진 빈칸만), 마지막 통과(같은 날짜로 이어진 칸들)
+  // 칸 하나에 적힌 통과 날짜들 ("11/18, 2/3" → ['11/18', '2/3'])
+  function passesOf(row, u) {
+    return String(row.cells[u.label] || '').split(/[,\n]/).map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+
+  // 학생 한 줄의 상태
+  //  회독(round): 모든 Day 칸의 날짜 개수 중 가장 작은 값 + 1 (1회독을 다 마치면 2회독 Day 1부터)
+  //  다음 범위: 이번 회독에서 아직 통과하지 않은 첫 칸부터 '칸 수'만큼 (이어진 칸만)
+  //  최근: 마지막으로 같은 날짜에 통과한 칸들
   function studentInfo(row) {
     var book = matchBook(row.book);
     var units = prog.data.units.map(parseUnit).filter(Boolean).sort(function (x, y) { return x.a - y.a; });
     var max = book ? bookMaxDay(book) : 0;
     var inRange = units.filter(function (u) { return !max || u.a <= max; });
-    var val = function (u) { return row.cells[u.label] || ''; };
+    var cnt = function (u) { return passesOf(row, u).length; };
+    var round = inRange.length ? Math.min.apply(null, inRange.map(cnt)) + 1 : 1;
     var count = getCount(row);
-    var done = inRange.filter(val).length;
+    var done = inRange.filter(function (u) { return cnt(u) >= round; }).length;
 
-    var next = null, i = inRange.findIndex(function (u) { return !val(u); });
+    var next = null, i = inRange.findIndex(function (u) { return cnt(u) < round; });
     if (i >= 0) {
       var pick = [inRange[i]];
       for (var k = i + 1; k < inRange.length && pick.length < count; k++) {
-        if (val(inRange[k]) || inRange[k].a !== pick[pick.length - 1].b + 1) break;
+        if (cnt(inRange[k]) >= round || inRange[k].a !== pick[pick.length - 1].b + 1) break;
         pick.push(inRange[k]);
       }
       next = joinUnits(pick);
     }
 
-    var last = null, li = -1;
-    for (var x = inRange.length - 1; x >= 0; x--) { if (val(inRange[x])) { li = x; break; } }
+    // 이번 회독에 통과한 칸이 있으면 그중 마지막 묶음, 없으면(새 회독 시작 직후) 지난 회독의 마지막 묶음
+    var last = null, li = -1, nth = round - 1;
+    for (var x = inRange.length - 1; x >= 0; x--) { if (cnt(inRange[x]) >= round) { li = x; break; } }
+    if (li < 0 && round > 1) { li = inRange.length - 1; nth = round - 2; }
     if (li >= 0) {
-      var date = val(inRange[li]), grp = [inRange[li]];
-      for (var y = li - 1; y >= 0 && val(inRange[y]) === date && inRange[y].b === grp[0].a - 1; y--) grp.unshift(inRange[y]);
-      last = { range: joinUnits(grp), date: date };
+      var dateAt = function (u) { return passesOf(row, u)[nth]; };
+      var date = dateAt(inRange[li]), grp = [inRange[li]];
+      for (var y = li - 1; y >= 0 && cnt(inRange[y]) === nth + 1 && dateAt(inRange[y]) === date && inRange[y].b === grp[0].a - 1; y--) grp.unshift(inRange[y]);
+      last = { range: joinUnits(grp), date: date, round: nth + 1 };
     }
-    return { book: book, next: next, last: last, done: done, total: inRange.length, count: count };
+    return { book: book, next: next, last: last, done: done, total: inRange.length, count: count, round: round };
   }
 
   function api(method, body) {
@@ -753,10 +765,15 @@
     $('progRefresh').disabled = true;
     api('GET').then(function (j) {
       prog.data = j;
+      prog.version = j.version || 1;
       // 시트에서 사라진 학생은 선택 해제
       var rs = new Set(j.rows.map(function (x) { return x.r; }));
       prog.selected.forEach(function (r) { if (!rs.has(r)) prog.selected.delete(r); });
-      setStatus('연결됨 · ' + j.sheet + ' · 학생 ' + j.rows.length + '명', 'ok');
+      if (prog.version < 3) {
+        setStatus('Apps Script를 새 버전으로 업데이트해야 통과를 기록할 수 있습니다 (예전 버전은 회독 날짜를 덮어씀). README의 "진도표(구글 시트) 연결" 2번을 다시 해 주세요.', 'err');
+      } else {
+        setStatus('연결됨 · ' + j.sheet + ' · 학생 ' + j.rows.length + '명', 'ok');
+      }
       $('sheetBox').classList.add('connected');
       renderProgList();
       renderBatchSoon();
@@ -813,6 +830,7 @@
     groups = groups.map(function (g, i) { return { g: g, i: i }; })
       .sort(function (a, b) { return gidx(a.g.grade) - gidx(b.g.grade) || a.i - b.i; })
       .map(function (x) { return x.g; });
+    var canWrite = prog.version >= 3;
     var html = '';
     groups.forEach(function (g, gi) {
       var info0 = studentInfo(g.rows[0]);
@@ -828,19 +846,19 @@
         var st = studentInfo(row);
         var on = prog.selected.has(row.r);
         var nextTxt = !st.book ? '-' : st.next ? 'Day ' + st.next.label : (st.total ? '완료' : '-');
-        var lastTxt = st.last ? 'Day ' + st.last.range.label + ' · ' + st.last.date : '기록 없음';
+        var lastTxt = st.last ? 'Day ' + st.last.range.label + ' · ' + st.last.date + (st.last.round < st.round ? ' (' + st.last.round + '회독)' : '') : '기록 없음';
         var cntOpts = '';
         for (var n = 1; n <= 5; n++) cntOpts += '<option value="' + n + '"' + (n === st.count ? ' selected' : '') + '>' + n + '</option>';
         html += '<tr class="' + (on ? 'on' : '') + '">' +
           '<td class="c-chk"><input type="checkbox" data-r="' + row.r + '"' + (on ? ' checked' : '') + (st.book && st.next ? '' : ' disabled') + '></td>' +
-          '<td class="c-name">' + esc(row.name) + (row.note ? '<span class="note" title="' + esc(row.note) + '">' + esc(row.note) + '</span>' : '') + '</td>' +
+          '<td class="c-name">' + esc(row.name) + (st.round > 1 ? '<span class="round">' + st.round + '회독</span>' : '') + (row.note ? '<span class="note" title="' + esc(row.note) + '">' + esc(row.note) + '</span>' : '') + '</td>' +
           '<td class="c-cnt"><select data-cnt="' + row.r + '" title="이번에 볼 Day 수"' + (st.book ? '' : ' disabled') + '>' + cntOpts + '</select><span class="lbl">개</span></td>' +
           '<td class="c-next"><span class="lbl">다음</span> <b>' + esc(nextTxt) + '</b></td>' +
           '<td class="c-last"><span class="lbl">최근</span> ' + esc(lastTxt) + '</td>' +
           '<td class="c-prog"><span class="bar"><i style="width:' + (st.total ? Math.round(st.done / st.total * 100) : 0) + '%"></i></span> ' + st.done + '/' + st.total + '</td>' +
           '<td class="c-act">' +
-            '<button type="button" class="btn small pass" data-pass="' + row.r + '"' + (st.book && st.next ? '' : ' disabled') + ' title="' + (st.next ? 'Day ' + esc(st.next.label) + ' 통과로 오늘 날짜 기록' : '') + '">통과 ✓</button>' +
-            '<button type="button" class="btn small undo" data-undo="' + row.r + '"' + (st.last ? '' : ' disabled') + ' title="마지막 통과 기록 지우기">↶</button>' +
+            '<button type="button" class="btn small pass" data-pass="' + row.r + '"' + (st.book && st.next && canWrite ? '' : ' disabled') + ' title="' + (st.next ? 'Day ' + esc(st.next.label) + ' 통과로 오늘 날짜 기록' : '') + '">통과 ✓</button>' +
+            '<button type="button" class="btn small undo" data-undo="' + row.r + '"' + (st.last && canWrite ? '' : ' disabled') + ' title="마지막 통과 기록 지우기">↶</button>' +
           '</td></tr>';
       });
       html += '</tbody></table></div>';
@@ -899,8 +917,8 @@
     range.units.reduce(function (p, label) {
       return p.then(function () {
         return api('POST', { action: 'set', r: r, name: row.name, unit: label, clear: !!undo }).then(function (j) {
-          row.cells[label] = undo ? '' : j.value;
-          lastValue = j.value;
+          row.cells[label] = j.value;
+          lastValue = j.date || '';
         });
       });
     }, Promise.resolve()).then(function () {
@@ -959,10 +977,10 @@
         var pool = poolFrom(data, days);
         var n = pool.length;
         var nm = ps.type === 'meaning' ? n : ps.type === 'spelling' ? 0 : Math.ceil(n / 2);
-        var key = [j.row.r, j.row.name, j.st.book.id, u.label, ps.type, ps.mode].join('|');
+        var key = [j.row.r, j.row.name, j.st.book.id, j.st.round, u.label, ps.type, ps.mode].join('|');
         if (force || !prog.qcache[key]) prog.qcache[key] = makeQuestions(pool, nm, n - nm, ps.mode);
         var qs = prog.qcache[key];
-        var title = (j.st.book.short || j.st.book.title) + ' Day ' + u.label;
+        var title = (j.st.book.short || j.st.book.title) + ' Day ' + u.label + (j.st.round > 1 ? ' (' + j.st.round + '회독)' : '');
         var s = { date: ps.date, hint: false, fontSize: 14, columns: 3, mode: ps.mode };
         var heading = function (d) { return 'Day ' + d; };
         var tw = document.createElement('div'); tw.className = 'student-set';
