@@ -674,19 +674,47 @@
   }
   function bookMaxDay(info) { return info && info.maxDay || 0; }
 
-  // 학생 한 줄의 상태: 교재, 교재 범위 안의 회차, 다음 범위, 마지막 통과
+  // 학생별 "이번에 볼 칸 수"(Day 단위 시트면 Day 수). 이 PC 브라우저에 기억한다
+  var COUNT_KEY = 'wordTest.dayCount';
+  function countMap() { try { return JSON.parse(lsGet(COUNT_KEY) || '{}'); } catch (e) { return {}; } }
+  function defaultCount() { return +($('progDefault') && $('progDefault').value) || 2; }
+  function getCount(row) { var m = countMap(); return +m[keyOf(row.book) + '|' + row.name] || defaultCount(); }
+  function setCount(row, n) { var m = countMap(); m[keyOf(row.book) + '|' + row.name] = n; lsSet(COUNT_KEY, JSON.stringify(m)); }
+
+  // 여러 칸을 하나의 범위로: [{a,b,label}] → {a, b, label:'7-9', units:['7','8','9']}
+  function joinUnits(list) {
+    var a = list[0].a, b = list[list.length - 1].b;
+    return { a: a, b: b, label: a === b ? String(a) : a + '-' + b, units: list.map(function (u) { return u.label; }) };
+  }
+
+  // 학생 한 줄의 상태: 교재, 다음 시험 범위(첫 빈칸부터 '칸 수'만큼, 이어진 빈칸만), 마지막 통과(같은 날짜로 이어진 칸들)
   function studentInfo(row) {
     var book = matchBook(row.book);
-    var units = prog.data.units.map(parseUnit).filter(Boolean);
+    var units = prog.data.units.map(parseUnit).filter(Boolean).sort(function (x, y) { return x.a - y.a; });
     var max = book ? bookMaxDay(book) : 0;
     var inRange = units.filter(function (u) { return !max || u.a <= max; });
-    var next = null, last = null, done = 0;
-    inRange.forEach(function (u) {
-      var v = row.cells[u.label];
-      if (v) { last = { unit: u, date: v }; done++; }
-      else if (!next) next = u;
-    });
-    return { book: book, next: next, last: last, done: done, total: inRange.length };
+    var val = function (u) { return row.cells[u.label] || ''; };
+    var count = getCount(row);
+    var done = inRange.filter(val).length;
+
+    var next = null, i = inRange.findIndex(function (u) { return !val(u); });
+    if (i >= 0) {
+      var pick = [inRange[i]];
+      for (var k = i + 1; k < inRange.length && pick.length < count; k++) {
+        if (val(inRange[k]) || inRange[k].a !== pick[pick.length - 1].b + 1) break;
+        pick.push(inRange[k]);
+      }
+      next = joinUnits(pick);
+    }
+
+    var last = null, li = -1;
+    for (var x = inRange.length - 1; x >= 0; x--) { if (val(inRange[x])) { li = x; break; } }
+    if (li >= 0) {
+      var date = val(inRange[li]), grp = [inRange[li]];
+      for (var y = li - 1; y >= 0 && val(inRange[y]) === date && inRange[y].b === grp[0].a - 1; y--) grp.unshift(inRange[y]);
+      last = { range: joinUnits(grp), date: date };
+    }
+    return { book: book, next: next, last: last, done: done, total: inRange.length, count: count };
   }
 
   function api(method, body) {
@@ -766,10 +794,13 @@
         var st = studentInfo(row);
         var on = prog.selected.has(row.r);
         var nextTxt = !st.book ? '-' : st.next ? 'Day ' + st.next.label : (st.total ? '완료' : '-');
-        var lastTxt = st.last ? 'Day ' + st.last.unit.label + ' · ' + st.last.date : '기록 없음';
+        var lastTxt = st.last ? 'Day ' + st.last.range.label + ' · ' + st.last.date : '기록 없음';
+        var cntOpts = '';
+        for (var n = 1; n <= 5; n++) cntOpts += '<option value="' + n + '"' + (n === st.count ? ' selected' : '') + '>' + n + '</option>';
         html += '<tr class="' + (on ? 'on' : '') + '">' +
           '<td class="c-chk"><input type="checkbox" data-r="' + row.r + '"' + (on ? ' checked' : '') + (st.book && st.next ? '' : ' disabled') + '></td>' +
           '<td class="c-name">' + esc(row.name) + (row.note ? '<span class="note" title="' + esc(row.note) + '">' + esc(row.note) + '</span>' : '') + '</td>' +
+          '<td class="c-cnt"><select data-cnt="' + row.r + '" title="이번에 볼 Day 수"' + (st.book ? '' : ' disabled') + '>' + cntOpts + '</select><span class="lbl">개</span></td>' +
           '<td class="c-next"><span class="lbl">다음</span> <b>' + esc(nextTxt) + '</b></td>' +
           '<td class="c-last"><span class="lbl">최근</span> ' + esc(lastTxt) + '</td>' +
           '<td class="c-prog"><span class="bar"><i style="width:' + (st.total ? Math.round(st.done / st.total * 100) : 0) + '%"></i></span> ' + st.done + '/' + st.total + '</td>' +
@@ -801,6 +832,13 @@
         renderProgList(); renderBatchSoon();
       });
     });
+    qsa('#progTable select[data-cnt]').forEach(function (sel) {
+      sel.addEventListener('change', function () {
+        var row = prog.data.rows.find(function (x) { return x.r === +sel.getAttribute('data-cnt'); });
+        setCount(row, +sel.value);
+        renderProgList(); renderBatchSoon();
+      });
+    });
     qsa('#progTable [data-pass]').forEach(function (b) {
       b.addEventListener('click', function () { markPass(+b.getAttribute('data-pass'), false); });
     });
@@ -809,23 +847,34 @@
     });
   }
 
+  // 통과: 다음 범위의 칸 전부에 오늘 날짜 / 되돌리기: 마지막에 같은 날짜로 통과한 칸들을 지움
   function markPass(r, undo) {
     if (prog.busy) return;
     var row = prog.data.rows.find(function (x) { return x.r === r; });
     var st = studentInfo(row);
-    var unit = undo ? (st.last && st.last.unit) : st.next;
-    if (!unit) return;
-    if (undo && !confirm(row.name + ' — Day ' + unit.label + ' 통과 기록(' + st.last.date + ')을 지울까요?')) return;
+    var range = undo ? (st.last && st.last.range) : st.next;
+    if (!range) return;
+    if (undo && !confirm(row.name + ' — Day ' + range.label + ' 통과 기록(' + st.last.date + ')을 지울까요?')) return;
     prog.busy = true;
-    setStatus((undo ? '기록 지우는 중… ' : '기록하는 중… ') + row.name + ' Day ' + unit.label);
-    api('POST', { action: 'set', r: r, name: row.name, unit: unit.label, clear: !!undo }).then(function (j) {
-      row.cells[unit.label] = undo ? '' : j.value;
-      setStatus((undo ? '지움: ' : '통과 기록: ') + row.name + ' Day ' + unit.label + (undo ? '' : ' (' + j.value + ')'), 'ok');
+    setStatus((undo ? '기록 지우는 중… ' : '기록하는 중… ') + row.name + ' Day ' + range.label);
+    var lastValue = '';
+    // 칸마다 차례로 기록 (중간에 실패하면 거기서 멈추고 알림)
+    range.units.reduce(function (p, label) {
+      return p.then(function () {
+        return api('POST', { action: 'set', r: r, name: row.name, unit: label, clear: !!undo }).then(function (j) {
+          row.cells[label] = undo ? '' : j.value;
+          lastValue = j.value;
+        });
+      });
+    }, Promise.resolve()).then(function () {
+      setStatus((undo ? '지움: ' : '통과 기록: ') + row.name + ' Day ' + range.label + (undo ? '' : ' (' + lastValue + ')'), 'ok');
+    }).catch(function (err) {
+      setStatus('기록하지 못했습니다: ' + err.message + ' — 새로고침해서 확인하세요.', 'err');
+    }).then(function () {
+      prog.busy = false;
       renderProgList();
       renderBatchSoon();
-    }).catch(function (err) {
-      setStatus('기록하지 못했습니다: ' + err.message, 'err');
-    }).then(function () { prog.busy = false; });
+    });
   }
 
   function progSettings() {
@@ -928,6 +977,12 @@
     });
     $('progDate').addEventListener('change', function () { renderBatchSoon(); });
     $('progDate').value = todayStr();
+    var dflt = lsGet('wordTest.dayDefault');
+    if (dflt) $('progDefault').value = dflt;
+    $('progDefault').addEventListener('change', function () {
+      lsSet('wordTest.dayDefault', $('progDefault').value);
+      renderProgList(); renderBatchSoon();
+    });
     prog.url = lsGet(SHEET_KEY);
     $('sheetUrl').value = prog.url;
   }

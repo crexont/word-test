@@ -8,7 +8,7 @@
   // 저장된 화면 모드를 먼저 적용해 깜빡임 방지
   try { var t = localStorage.getItem('wordTest.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
 </script>
-<link rel="stylesheet" href="style.css?v=20261118o">
+<link rel="stylesheet" href="style.css?v=20261118p">
 </head>
 <body>
 <div class="layout">
@@ -46,6 +46,15 @@
           <div class="block-head">
             <h2>인쇄 설정</h2>
             <button type="button" class="btn small shuffle-btn" id="progShuffle">🔀 다시 섞기</button>
+          </div>
+          <div class="opt-row"><span>기본 Day 수</span>
+            <select id="progDefault" title="학생별로 따로 고르지 않았을 때 한 번에 볼 Day 수">
+              <option value="1">1개</option>
+              <option value="2" selected>2개</option>
+              <option value="3">3개</option>
+              <option value="4">4개</option>
+              <option value="5">5개</option>
+            </select>
           </div>
           <div class="opt-col"><span>문항</span>
             <div class="seg seg-full">
@@ -172,6 +181,6 @@
   </main>
 </div>
 
-<script src="app.js?v=20261118o"></script>
+<script src="app.js?v=20261118p"></script>
 </body>
 </html>
