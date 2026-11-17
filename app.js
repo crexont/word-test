@@ -32,7 +32,7 @@
         days: Array.from(state.selected),
         meaning: state.want.m, spelling: state.want.s,
         mode: s.mode, fontSize: s.fontSize, hint: s.hint,
-        academy: s.academy, title: s.title
+        title: s.title
       }));
     } catch (e) { /* 저장 불가(사생활 보호 모드 등) — 무시 */ }
   }
@@ -122,7 +122,6 @@
       columns: 2, // 시험지는 항상 2단
       fontSize: Number($('fontSize').value) || 14,
       hint: $('hint').checked,
-      academy: $('academy').value.trim(),
       title: $('title').value.trim(),
       date: $('date').value
     };
@@ -386,8 +385,11 @@
       if (idx === 0) {
         head.className = 'sheet-head';
         head.innerHTML =
-          (s.academy ? '<div class="sheet-academy">' + esc(s.academy) + '</div>' : '') +
-          '<h2 class="sheet-title">' + esc(title) + '</h2>' +
+          '<div class="sheet-top">' +
+            '<img class="sheet-logo" src="img/logo.png" alt="강서해밀">' +
+            '<h2 class="sheet-title">' + esc(title) + '</h2>' +
+            '<span></span>' +
+          '</div>' +
           '<div class="sheet-info">' +
             '<div><span class="lbl">날짜</span><span>' + esc(dateText) + '</span></div>' +
             '<div><span class="lbl">이름</span><span class="fill"></span></div>' +
@@ -567,7 +569,6 @@
     if (sv.fontSize) $('fontSize').value = String(sv.fontSize);
     if (!$('fontSize').value) $('fontSize').value = '14';
     $('hint').checked = !!sv.hint;
-    if (sv.academy) $('academy').value = sv.academy;
     if (sv.title) $('title').value = sv.title;
   }
 
@@ -595,9 +596,7 @@
     ['fontSize', 'hint', 'date'].forEach(function (id) {
       $(id).addEventListener('change', function () { update(); });
     });
-    ['academy', 'title'].forEach(function (id) {
-      $(id).addEventListener('input', function () { update(); });
-    });
+    $('title').addEventListener('input', function () { update(); });
     qsa('input[name="mode"]').forEach(function (el) {
       el.addEventListener('change', function () { update(); });
     });
