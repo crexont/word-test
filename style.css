@@ -190,7 +190,7 @@ button, input, select { font: inherit; color: inherit; }
 
 .sheet-head { flex: none; margin-bottom: 4mm; }
 .sheet-top { display: grid; grid-template-columns: 30mm 1fr 30mm; align-items: center; gap: 3mm; margin-bottom: 2.5mm; }
-.sheet-logo { height: 19mm; width: auto; max-width: 30mm; object-fit: contain; display: block; }
+.sheet-logo { height: 17mm; width: auto; max-width: 30mm; object-fit: contain; display: block; }
 .sheet-title { font-size: 21px; font-weight: 700; text-align: center; margin: 0; word-break: keep-all; }
 .sheet-info { display: grid; grid-template-columns: 1.1fr 1.4fr 1fr; border: 1.2px solid #000; font-size: 13px; }
 .sheet-info > div { padding: 2.2mm 3mm; display: flex; align-items: center; gap: 2mm; white-space: nowrap; }
@@ -204,7 +204,7 @@ button, input, select { font: inherit; color: inherit; }
 .sec-head .desc { font-weight: 400; font-size: .85em; color: #333; margin-left: 2mm; }
 .sec-head.later { padding-top: 3mm; }
 .col > .sec-head.later:first-child { padding-top: 1mm; }
-.q { display: flex; align-items: flex-start; column-gap: 1.5mm; padding-bottom: 1.15em; line-height: 1.45; break-inside: avoid; }
+.q { display: flex; align-items: flex-start; column-gap: 1.5mm; padding-bottom: var(--qgap, 1.1em); line-height: 1.45; break-inside: avoid; }
 .q .qn { flex: none; min-width: 1.9em; text-align: right; font-weight: 600; }
 .q .qc { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-end; column-gap: 2mm; }
 .q .qp { flex: 0 1 auto; min-width: 0; overflow-wrap: anywhere; }

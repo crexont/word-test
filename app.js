@@ -408,14 +408,8 @@
     }
     return cols;
   }
-  function finishFooters(pages, label) {
-    pages.forEach(function (p, i) {
-      p.page.querySelector('.page-foot').textContent =
-        (label ? label + ' · ' : '') + (i + 1) + ' / ' + pages.length;
-    });
-  }
-
-  function renderTest(qs, s, title) {
+  // gap: 문항 사이 간격(em). 만들어진 페이지 수를 돌려준다
+  function renderTest(qs, s, title, gap) {
     var container = $('testPages');
     container.innerHTML = '';
     var total = qs.length;
@@ -425,6 +419,7 @@
       var page = document.createElement('div');
       page.className = 'page test';
       page.style.fontSize = s.fontSize + 'px';
+      page.style.setProperty('--qgap', gap + 'em');
       var head = document.createElement('div');
       if (idx === 0) {
         head.className = 'sheet-head';
@@ -447,16 +442,13 @@
       var body = document.createElement('div');
       body.className = 'page-body';
       page.appendChild(body);
-      var foot = document.createElement('div');
-      foot.className = 'page-foot';
-      page.appendChild(foot);
       return { page: page, cols: makeCols(body, s.columns) };
     }
 
     var els = [];
     function qEl(q) {
       var d = document.createElement('div');
-      d.className = 'q';
+      d.className = q.type === 'spelling' ? 'q sp' : 'q';
       var prompt = q.type === 'meaning'
         ? '<span class="qp en">' + esc(q.w.en) + '</span>'
         : '<span class="qp">' + esc(q.w.ko) + '</span>';
@@ -481,7 +473,7 @@
       qEl(q);
     });
 
-    finishFooters(paginate(container, makePage, els), '');
+    return paginate(container, makePage, els).length;
   }
 
   function renderAnswers(qs, s, title) {
@@ -500,9 +492,6 @@
       var body = document.createElement('div');
       body.className = 'page-body';
       page.appendChild(body);
-      var foot = document.createElement('div');
-      foot.className = 'page-foot';
-      page.appendChild(foot);
       return { page: page, cols: makeCols(body, 3) };
     }
 
@@ -532,7 +521,7 @@
       aEl(q);
     });
 
-    finishFooters(paginate(container, makePage, els), '답지');
+    paginate(container, makePage, els);
   }
 
   // 미리보기를 칸 너비에 맞게 축소
@@ -580,7 +569,14 @@
     var qs = buildQuestions(s, force);
     var title = s.title || autoTitle();
     $('scaler').style.transform = 'none';
-    renderTest(qs, s, title);
+    // 가장 좁은 간격으로 만들 때의 페이지 수를 넘지 않는 범위에서, 가장 넓은 간격을 고른다
+    // (예: 80문항이면 1장에 들어가는 가장 넓은 간격)
+    var gaps = [1.5, 1.35, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7];
+    var minPages = renderTest(qs, s, title, gaps[gaps.length - 1]);
+    for (var i = 0; i < gaps.length - 1; i++) {
+      if (renderTest(qs, s, title, gaps[i]) <= minPages) break;
+    }
+    if (i === gaps.length - 1) renderTest(qs, s, title, gaps[i]);
     renderAnswers(qs, s, title);
     fitPreview();
   }
