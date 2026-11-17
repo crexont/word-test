@@ -118,7 +118,7 @@
     return {
       meaning: toInt($('meaningCount').value),
       spelling: toInt($('spellingCount').value),
-      mode: radioValue('mode') || 'byday',
+      mode: radioValue('mode') || 'random',
       columns: 3, // 시험지는 항상 3단
       fontSize: 14, // 글자 크기는 '보통'으로 고정
       hint: $('hint').checked,
@@ -310,7 +310,22 @@
     }
     function overflows(col) { return col.scrollHeight > col.clientHeight + 1; }
 
-    elements.forEach(function (el) {
+    var grouped = false;
+    elements.forEach(function (el, idx) {
+      // 묶음 소제목(Day): 단 아래쪽에 소제목과 문항 2~3개만 덩그러니 남지 않도록,
+      // 소제목 + 첫 3문항이 안 들어가면 다음 단에서 시작 (공간 낭비를 줄이려고 묶음 전체는 따지지 않음)
+      var n = Number(el.getAttribute('data-group') || 0);
+      if (n) {
+        grouped = true;
+        var c = cur.cols[ci];
+        if (c.children.length > 0) {
+          var group = elements.slice(idx, idx + 1 + Math.min(n, 3));
+          group.forEach(function (g) { c.appendChild(g); });
+          var over = overflows(c);
+          group.forEach(function (g) { c.removeChild(g); });
+          if (over) nextCol();
+        }
+      }
       for (;;) {
         var col = cur.cols[ci];
         col.appendChild(el);
@@ -326,7 +341,7 @@
         if (carry) cur.cols[ci].appendChild(carry);
       }
     });
-    balanceLastPage(pages[pages.length - 1]);
+    if (!grouped) balanceLastPage(pages[pages.length - 1]); // 묶음 배치는 단 맞추기를 하지 않음
     return pages;
   }
 
@@ -433,8 +448,19 @@
       els.push(d);
     }
 
-    // 소제목 없이 문항만 (나눠서: 뜻 문항 → 스펠링 문항 순서)
-    qs.forEach(qEl);
+    // Day별로 무작위일 때만 "Day 1" 같은 소제목을 넣는다
+    var lastDay = null;
+    qs.forEach(function (q) {
+      if (s.mode === 'byday' && q.w.day !== lastDay) {
+        var h = document.createElement('div');
+        h.className = 'sec-head keep-next' + (lastDay !== null ? ' later' : '');
+        h.textContent = 'Day ' + q.w.day;
+        h.setAttribute('data-group', qs.filter(function (x) { return x.w.day === q.w.day; }).length);
+        els.push(h);
+        lastDay = q.w.day;
+      }
+      qEl(q);
+    });
 
     finishFooters(paginate(container, makePage, els), '');
   }

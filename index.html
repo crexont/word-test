@@ -14,7 +14,6 @@
 <header class="top">
   <button type="button" class="theme-btn" id="themeBtn" aria-label="화면 모드 바꾸기">🌙 다크 모드</button>
   <h1>영어 단어 시험지 생성기</h1>
-  <p class="sub">교재 → Day → 문항 수만 고르면 오른쪽에 바로 시험지가 만들어집니다.</p>
 </header>
 
 <section class="books">
@@ -31,8 +30,7 @@
           <button type="button" class="btn small" id="selectNone">해제</button>
         </div>
       </div>
-      <p class="tiny">Shift+클릭으로 범위를 한 번에 선택할 수 있습니다.</p>
-      <div id="dayGrid" class="day-grid"></div>
+      <div id="dayGrid" class="day-grid" title="Shift+클릭: 범위 선택"></div>
     </div>
 
     <div class="block">
@@ -64,7 +62,6 @@
         <button type="button" class="chip" data-quick="spelling">전부 스펠링</button>
         <button type="button" class="chip" data-quick="half">반반</button>
       </div>
-      <p class="tiny">같은 단어는 뜻·스펠링 중 한 유형에만 나옵니다.</p>
     </div>
 
     <div class="block">
@@ -73,10 +70,9 @@
         <button type="button" class="btn small shuffle-btn" id="shuffleBtn2">🔀 다시 섞기</button>
       </div>
       <div class="seg seg-full">
-        <label><input type="radio" name="mode" value="byday" checked><span>Day별로 무작위</span></label>
-        <label><input type="radio" name="mode" value="random"><span>Day 구분 없이 무작위</span></label>
+        <label><input type="radio" name="mode" value="random" checked><span>Day 구분 없이 무작위</span></label>
+        <label><input type="radio" name="mode" value="byday"><span>Day별로 무작위</span></label>
       </div>
-      <p class="tiny">뜻·스펠링 문제는 섞여서 나옵니다. 다시 섞기를 누르면 순서가 새로 바뀝니다.</p>
       <div class="opt-row"><span>첫 글자 힌트</span>
         <label class="switch"><input type="checkbox" id="hint"><span class="knob"></span><span class="tiny">스펠링 문제</span></label>
       </div>
@@ -85,7 +81,6 @@
     <div class="block">
       <h2>시험지 정보</h2>
       <label class="field"><span class="field-label">시험 제목 <button type="button" class="link-btn" id="titleReset" hidden>↺ 자동 제목으로</button></span><input type="text" id="title"></label>
-      <p class="tiny field-note">교재와 Day를 바꾸면 자동으로 채워집니다. 직접 고쳐도 됩니다.</p>
       <label class="field">날짜<input type="date" id="date"></label>
     </div>
   </aside>

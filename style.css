@@ -181,6 +181,7 @@ button, input, select { font: inherit; color: inherit; }
 .sec-head { font-weight: 700; padding: 1mm 0 2.5mm; font-size: 1.05em; }
 .sec-head .desc { font-weight: 400; font-size: .85em; color: #333; margin-left: 2mm; }
 .sec-head.later { padding-top: 3mm; }
+.col > .sec-head.later:first-child { padding-top: 1mm; }
 .q { display: flex; align-items: flex-start; column-gap: 1.5mm; padding-bottom: .85em; line-height: 1.45; break-inside: avoid; }
 .q .qn { flex: none; min-width: 1.9em; text-align: right; font-weight: 600; }
 .q .qc { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-end; column-gap: 2mm; }
