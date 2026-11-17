@@ -4,10 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>영어 단어 시험지 생성기</title>
+<script>
+  // 저장된 화면 모드를 먼저 적용해 깜빡임 방지
+  try { var t = localStorage.getItem('wordTest.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="top">
+  <button type="button" class="theme-btn" id="themeBtn" aria-label="화면 모드 바꾸기">🌙 다크 모드</button>
   <h1>영어 단어 시험지 생성기</h1>
   <p class="sub">교재 → Day → 문항 수만 고르면 오른쪽에 바로 시험지가 만들어집니다.</p>
 </header>
@@ -39,7 +44,7 @@
         <span class="type-name"><span class="dot d1"></span>뜻 쓰기</span>
         <div class="stepper" data-target="meaningCount">
           <button type="button" class="mini" data-act="dec" aria-label="하나 줄이기">−</button>
-          <input type="number" id="meaningCount" min="0" value="10" inputmode="numeric">
+          <input type="number" id="meaningCount" min="0" value="0" inputmode="numeric">
           <button type="button" class="mini" data-act="inc" aria-label="하나 늘리기">+</button>
           <button type="button" class="mini wide" data-act="max">최대</button>
         </div>
@@ -48,7 +53,7 @@
         <span class="type-name"><span class="dot d2"></span>스펠링 쓰기</span>
         <div class="stepper" data-target="spellingCount">
           <button type="button" class="mini" data-act="dec" aria-label="하나 줄이기">−</button>
-          <input type="number" id="spellingCount" min="0" value="10" inputmode="numeric">
+          <input type="number" id="spellingCount" min="0" value="0" inputmode="numeric">
           <button type="button" class="mini" data-act="inc" aria-label="하나 늘리기">+</button>
           <button type="button" class="mini wide" data-act="max">최대</button>
         </div>

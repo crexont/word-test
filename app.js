@@ -14,7 +14,7 @@
     lastClicked: null,   // Shift+클릭 기준 인덱스
     questions: null,
     questionKey: '',
-    want: { m: 10, s: 10 }, // 사용자가 원한 문항 수
+    want: { m: 0, s: 0, all: true }, // 사용자가 원한 문항 수 (all: 뜻 100% 기본값)
     titleEdited: false      // 시험 제목을 직접 고쳤는지
   };
 
@@ -31,7 +31,6 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         bookId: state.bookId,
         days: Array.from(state.selected),
-        meaning: state.want.m, spelling: state.want.s,
         mode: s.mode, hint: s.hint,
         title: state.titleEdited ? s.title : ''
       }));
@@ -240,7 +239,8 @@
       state.want = { m: mv, s: sv };
     } else {
       mv = state.want.m; sv = state.want.s;
-      if (total > 0 && mv + sv > total) {
+      if (state.want.all) { mv = total; sv = 0; } // 기본값: 선택한 단어 전부 뜻 쓰기
+      else if (total > 0 && mv + sv > total) {
         mv = Math.min(mv, total);
         sv = Math.max(0, Math.min(sv, total - mv));
         warn = '선택한 단어가 ' + total + '개라서 문항 수를 줄였습니다 (원래 설정: 뜻 ' +
@@ -268,7 +268,7 @@
     var n = toInt($('meaningCount').value) + toInt($('spellingCount').value);
     if (n === 0 || n > total) n = total;
     var m = kind === 'meaning' ? n : kind === 'spelling' ? 0 : Math.ceil(n / 2);
-    state.want = { m: m, s: n - m };
+    state.want = { m: m, s: n - m, all: kind === 'meaning' && n === total };
     update();
   }
 
@@ -562,16 +562,33 @@
 
   // ---------- 초기화 ----------
   function applySaved(sv) {
-    if (sv.meaning != null) state.want.m = toInt(sv.meaning);
-    if (sv.spelling != null) state.want.s = toInt(sv.spelling);
-    $('meaningCount').value = state.want.m;
-    $('spellingCount').value = state.want.s;
+    // 문항 수는 저장하지 않고 항상 '뜻 100%'로 시작
+    $('meaningCount').value = 0;
+    $('spellingCount').value = 0;
     if (sv.mode) { var r = document.querySelector('input[name="mode"][value="' + sv.mode + '"]'); if (r) r.checked = true; }
     $('hint').checked = !!sv.hint;
     if (sv.title) { $('title').value = sv.title; state.titleEdited = true; }
   }
 
+  // ---------- 라이트/다크 모드 ----------
+  function currentTheme() {
+    var t = document.documentElement.getAttribute('data-theme');
+    if (t) return t;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  function updateThemeBtn() {
+    $('themeBtn').textContent = currentTheme() === 'dark' ? '☀️ 라이트 모드' : '🌙 다크 모드';
+  }
+  function toggleTheme() {
+    var next = currentTheme() === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('wordTest.theme', next); } catch (e) { /* 무시 */ }
+    updateThemeBtn();
+  }
+
   function bind() {
+    $('themeBtn').addEventListener('click', toggleTheme);
+    updateThemeBtn();
     $('selectAll').addEventListener('click', function () {
       state.book.days.forEach(function (d) { state.selected.add(d.day); });
       renderDays(); update();
