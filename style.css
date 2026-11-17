@@ -74,6 +74,10 @@ button, input, select { font: inherit; color: inherit; }
 .book-card.active .check-mark { display: grid; }
 .book-card .b-title { display: block; margin-top: 7px; font-size: 12.5px; font-weight: 600; line-height: 1.35; word-break: keep-all; }
 .book-card.active .b-title { color: var(--accent); }
+.b-scope { display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--seg); color: var(--muted); }
+.b-scope.deriv { background: #e7f6ef; color: #17805a; }
+:root[data-theme="dark"] .b-scope.deriv { background: #1f3a30; color: #7fd8b0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .b-scope.deriv { background: #1f3a30; color: #7fd8b0; } }
 
 /* 작업 영역 */
 .work { display: flex; align-items: flex-start; gap: 20px; padding: 0 28px 28px; }

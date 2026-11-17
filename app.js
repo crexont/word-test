@@ -171,7 +171,8 @@
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'book-card' + (b.id === state.bookId ? ' active' : '');
-      btn.innerHTML = coverHTML(b, idx) + '<span class="b-title">' + esc(b.title) + '</span>';
+      btn.innerHTML = coverHTML(b, idx) + '<span class="b-title">' + esc(b.title) + '</span>' +
+        (b.scope ? '<span class="b-scope' + (b.scope.indexOf('파생어') >= 0 ? ' deriv' : '') + '">' + esc(b.scope) + '</span>' : '');
       btn.addEventListener('click', function () { if (b.id !== state.bookId) loadBook(b.id, null); });
       list.appendChild(btn);
     });
