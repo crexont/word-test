@@ -766,26 +766,60 @@
     }).then(function () { $('progRefresh').disabled = false; });
   }
 
+  // 시트에 있는 학년 목록 (중1 → 고3 순서, 그 밖의 값은 뒤에)
+  var GRADE_ORDER = ['초4', '초5', '초6', '중1', '중2', '중3', '고1', '고2', '고3'];
+  function gradeList() {
+    var set = [];
+    prog.data.rows.forEach(function (r) { if (r.grade && set.indexOf(r.grade) < 0) set.push(r.grade); });
+    return set.sort(function (a, b) {
+      var ia = GRADE_ORDER.indexOf(a), ib = GRADE_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+    });
+  }
+  function setGrade(g) {
+    prog.grade = g;
+    lsSet('wordTest.grade', g);
+    // 다른 학년으로 바꾸면, 보이지 않는 학생의 선택은 풀어서 엉뚱하게 같이 인쇄되지 않게
+    prog.data.rows.forEach(function (r) { if (g && r.grade !== g) prog.selected.delete(r.r); });
+    renderProgList(); renderBatchSoon();
+  }
+
   function renderProgList() {
     var box = $('progTable');
     if (!prog.data) {
       box.innerHTML = '<p class="muted pad">구글 시트를 연결하면 학생 목록이 나타납니다.</p>';
       $('progCount').textContent = '';
+      $('gradeChips').innerHTML = '';
       return;
     }
-    // 교재별로 묶기 (시트 순서 유지)
+    // 학년 필터 (시트에 학년 칸이 있을 때만)
+    var grades = gradeList();
+    var gf = grades.indexOf(prog.grade) >= 0 ? prog.grade : '';
+    $('gradeChips').innerHTML = grades.length ? ['', ].concat(grades).map(function (g) {
+      var n = prog.data.rows.filter(function (r) { return !g || r.grade === g; }).length;
+      return '<button type="button" class="chip' + (g === gf ? ' on' : '') + '" data-grade="' + esc(g) + '">' + esc(g || '전체') + ' <small>' + n + '</small></button>';
+    }).join('') : '';
+    var visible = prog.data.rows.filter(function (r) { return !gf || r.grade === gf; });
+
+    // 학년·교재별로 묶기 (시트 순서 유지)
     var groups = [], byKey = {};
-    prog.data.rows.forEach(function (row) {
-      var k = row.book || '(교재 없음)';
-      if (!byKey[k]) { byKey[k] = { name: k, rows: [] }; groups.push(byKey[k]); }
+    visible.forEach(function (row) {
+      var k = (row.grade || '') + '|' + (row.book || '(교재 없음)');
+      if (!byKey[k]) { byKey[k] = { grade: row.grade || '', name: row.book || '(교재 없음)', rows: [] }; groups.push(byKey[k]); }
       byKey[k].rows.push(row);
     });
+    // 학년 순서(중3 → 고1 → 고2 …)로, 같은 학년 안에서는 시트 순서대로
+    var gidx = function (g) { var i = grades.indexOf(g); return i < 0 ? 99 : i; };
+    groups = groups.map(function (g, i) { return { g: g, i: i }; })
+      .sort(function (a, b) { return gidx(a.g.grade) - gidx(b.g.grade) || a.i - b.i; })
+      .map(function (x) { return x.g; });
     var html = '';
     groups.forEach(function (g, gi) {
       var info0 = studentInfo(g.rows[0]);
       var allOn = g.rows.every(function (r) { return prog.selected.has(r.r); });
       html += '<div class="pgroup">' +
         '<div class="pgroup-head"><label class="check"><input type="checkbox" data-group="' + gi + '"' + (allOn ? ' checked' : '') + '> ' +
+        (g.grade ? '<span class="grade-tag">' + esc(g.grade) + '</span>' : '') +
         esc(info0.book ? (info0.book.short || info0.book.title) : g.name) + '</label>' +
         (info0.book ? '<span class="tiny">' + esc(info0.book.title) + ' · ' + g.rows.length + '명</span>'
                     : '<span class="warn">교재를 찾지 못했습니다: "' + esc(g.name) + '"</span>') +
@@ -815,6 +849,9 @@
     $('progCount').textContent = prog.selected.size ? '· ' + prog.selected.size + '명 선택' : '';
 
     // 이벤트
+    qsa('#gradeChips [data-grade]').forEach(function (b) {
+      b.addEventListener('click', function () { setGrade(b.getAttribute('data-grade')); });
+    });
     qsa('#progTable input[data-r]').forEach(function (cb) {
       cb.addEventListener('change', function () {
         var r = +cb.getAttribute('data-r');
@@ -984,6 +1021,7 @@
       renderProgList(); renderBatchSoon();
     });
     prog.url = lsGet(SHEET_KEY);
+    prog.grade = lsGet('wordTest.grade');
     $('sheetUrl').value = prog.url;
   }
   window.addEventListener('afterprint', function () {

@@ -2,9 +2,9 @@
  * 영어 단어 시험지 생성기 ↔ 구글 시트 진도표 연결용 Apps Script
  *
  * 시트 형식 (머리글 한 줄 또는 두 줄 모두 가능)
- *   교재 | 이름 | 1-2 | 3-4 | 5-6 | ... | 비고
- *   - '교재' 칸은 병합해도 됩니다 (위 칸의 교재를 이어서 씁니다).
- *   - 범위 칸(1-2, 3-4 ...)에 통과 날짜를 적습니다. 빈칸 = 아직 통과 전.
+ *   학년 | 교재 | 이름 | 1 | 2 | 3 | ... | 비고      (학년 칸은 없어도 됩니다)
+ *   - '학년'·'교재' 칸은 병합해도 됩니다 (위 칸의 값을 이어서 씁니다).
+ *   - Day 칸(1, 2, 3 ... 또는 1-2, 3-4 ...)에 통과 날짜를 적습니다. 빈칸 = 아직 통과 전.
  *   - 머리글이 두 줄이면(위: '이름', 아래: '1-2' ...) 자동으로 합쳐 읽습니다.
  *
  * 설치: README의 "진도표(구글 시트) 연결" 순서를 따르세요.
@@ -60,6 +60,7 @@ function layout_(values) {
   return {
     headerRow: h,
     firstDataRow: h + (twoRows ? 2 : 1),
+    iGrade: labels.indexOf('학년'),
     iBook: labels.indexOf('교재'),
     iName: labels.indexOf('이름'),
     iNote: labels.indexOf('비고'),
@@ -71,15 +72,16 @@ function list_() {
   var sh = sheet_();
   var values = sh.getDataRange().getDisplayValues();
   var L = layout_(values);
-  var rows = [], book = '';
+  var rows = [], book = '', grade = '';
   for (var r = L.firstDataRow; r < values.length; r++) {
     var row = values[r];
+    if (L.iGrade >= 0 && String(row[L.iGrade]).trim()) grade = String(row[L.iGrade]).trim();
     if (L.iBook >= 0 && String(row[L.iBook]).trim()) book = String(row[L.iBook]).trim();
     var name = String(row[L.iName] || '').trim();
     if (!name) continue;
     var cells = {};
     L.units.forEach(function (u) { cells[u.label] = String(row[u.col] || '').trim(); });
-    rows.push({ r: r + 1, book: book, name: name, note: L.iNote >= 0 ? String(row[L.iNote] || '').trim() : '', cells: cells });
+    rows.push({ r: r + 1, grade: grade, book: book, name: name, note: L.iNote >= 0 ? String(row[L.iNote] || '').trim() : '', cells: cells });
   }
   return { ok: true, sheet: sh.getName(), units: L.units.map(function (u) { return u.label; }), rows: rows };
 }
