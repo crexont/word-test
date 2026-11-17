@@ -14,7 +14,8 @@
     lastClicked: null,   // Shift+클릭 기준 인덱스
     questions: null,
     questionKey: '',
-    want: { m: 10, s: 10 } // 사용자가 원한 문항 수
+    want: { m: 10, s: 10 }, // 사용자가 원한 문항 수
+    titleEdited: false      // 시험 제목을 직접 고쳤는지
   };
 
   // ---------- 저장/불러오기 ----------
@@ -32,7 +33,7 @@
         days: Array.from(state.selected),
         meaning: state.want.m, spelling: state.want.s,
         mode: s.mode, fontSize: s.fontSize, hint: s.hint,
-        title: s.title
+        title: state.titleEdited ? s.title : ''
       }));
     } catch (e) { /* 저장 불가(사생활 보호 모드 등) — 무시 */ }
   }
@@ -65,14 +66,14 @@
     var n = parseInt(v, 10);
     return isNaN(n) || n < 0 ? 0 : n;
   }
-  // [1,2,3,5] -> "1~3, 5"
+  // [1,2,3,5] -> "1-3, 5"
   function rangeText(nums) {
     var sorted = nums.slice().sort(function (a, b) { return a - b; });
     var out = [], i = 0;
     while (i < sorted.length) {
       var j = i;
       while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
-      out.push(j > i ? sorted[i] + '~' + sorted[j] : String(sorted[i]));
+      out.push(j > i ? sorted[i] + '-' + sorted[j] : String(sorted[i]));
       i = j + 1;
     }
     return out.join(', ');
@@ -129,7 +130,8 @@
   function autoTitle() {
     if (!state.book) return '';
     var days = selectedDaysSorted();
-    return state.book.title + (days.length ? ' Day ' + rangeText(days) : '') + ' 단어 시험';
+    // 예: "수능2000 Day 1-2" (books.json의 short가 있으면 약칭 사용)
+    return (state.book.short || state.book.title) + (days.length ? ' Day ' + rangeText(days) : '');
   }
 
   // ---------- 교재 ----------
@@ -169,14 +171,14 @@
     return fetchJSON(info.file).then(function (data) {
       var changed = state.bookId !== id;
       state.bookId = id;
-      state.book = { title: data.title || info.title, days: (data.days || []).slice() };
+      state.book = { title: data.title || info.title, short: info.short || '', days: (data.days || []).slice() };
       state.book.days.sort(function (a, b) { return a.day - b.day; });
       state.selected = new Set();
       if (restoreDays) {
         var valid = new Set(state.book.days.map(function (d) { return d.day; }));
         restoreDays.forEach(function (d) { if (valid.has(d)) state.selected.add(d); });
       } else if (changed) {
-        $('title').value = '';
+        state.titleEdited = false;
       }
       state.lastClicked = null;
       state.questionKey = '';
@@ -523,7 +525,10 @@
     var pool = wordPool();
     $('totalWords').textContent = pool.length;
     $('sumCount').textContent = s.meaning + s.spelling;
-    $('title').placeholder = autoTitle() || '비우면 자동으로 만들어집니다';
+    // 직접 고치지 않았으면 제목 칸을 자동 제목으로 계속 채운다
+    if (!state.titleEdited) $('title').value = autoTitle();
+    $('title').placeholder = autoTitle();
+    $('titleReset').hidden = !state.titleEdited;
     save();
 
     var msg = state.selected.size === 0 ? '왼쪽에서 시험에 낼 Day를 선택하세요.'
@@ -569,7 +574,7 @@
     if (sv.fontSize) $('fontSize').value = String(sv.fontSize);
     if (!$('fontSize').value) $('fontSize').value = '14';
     $('hint').checked = !!sv.hint;
-    if (sv.title) $('title').value = sv.title;
+    if (sv.title) { $('title').value = sv.title; state.titleEdited = true; }
   }
 
   function bind() {
@@ -596,7 +601,15 @@
     ['fontSize', 'hint', 'date'].forEach(function (id) {
       $(id).addEventListener('change', function () { update(); });
     });
-    $('title').addEventListener('input', function () { update(); });
+    $('title').addEventListener('input', function () {
+      // 칸을 비우면 다시 자동 제목으로
+      state.titleEdited = $('title').value.trim() !== '' && $('title').value.trim() !== autoTitle();
+      update();
+    });
+    $('titleReset').addEventListener('click', function () {
+      state.titleEdited = false;
+      update();
+    });
     qsa('input[name="mode"]').forEach(function (el) {
       el.addEventListener('change', function () { update(); });
     });
