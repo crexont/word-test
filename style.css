@@ -80,7 +80,7 @@ button, input, select { font: inherit; color: inherit; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .b-scope.deriv { background: #1f3a30; color: #7fd8b0; } }
 
 /* 작업 영역 */
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) clamp(360px, 31vw, 560px); min-height: 100vh; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) clamp(360px, 33%, 500px); min-height: 100vh; max-width: 1440px; margin: 0 auto; }
 .left { min-width: 0; }
 .work {
   display: grid; gap: 10px; padding: 0 24px 8px; align-items: start;
@@ -162,7 +162,7 @@ button, input, select { font: inherit; color: inherit; }
 .preview {
   position: sticky; top: 0; height: 100vh; min-width: 0;
   display: flex; flex-direction: column;
-  background: var(--card); border-left: 1px solid var(--line);
+  background: var(--card); border-left: 1px solid var(--line); border-right: 1px solid var(--line);
 }
 .toolbar {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
