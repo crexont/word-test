@@ -53,6 +53,48 @@ button, input, select { font: inherit; color: inherit; }
 .top h1 { font-size: 19px; margin: 0; letter-spacing: -0.4px; }
 .top .sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 
+/* 탭 */
+.top .spacer { flex: 1; }
+.tabs { display: inline-flex; background: var(--seg); border-radius: 10px; padding: 3px; margin-left: 8px; }
+.tabs button { border: 0; background: none; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13.5px; color: var(--muted); }
+.tabs button.active { background: var(--surface); color: var(--accent); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+body.view-prog .books, body.view-prog #work { display: none !important; }
+
+/* 진도표 */
+.prog { padding: 8px 24px 12px; display: flex; flex-direction: column; gap: 10px; }
+.sheet-box .block-head { flex-wrap: wrap; }
+.sheet-box .status { flex: 1; margin: 0 0 0 4px; }
+.status.ok { color: var(--green); }
+.status.err { color: var(--warn); }
+.sheet-box .when-connected { display: none; }
+.sheet-box.connected .when-connected { display: inline; }
+.sheet-box.connected .when-disconnected { display: none; }
+.sheet-box .field-row { margin-top: 8px; }
+.sheet-box .field input { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; }
+.prog-grid { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 10px; align-items: start; }
+.opt-col { margin: 6px 0 8px; }
+.opt-col > span { display: block; font-size: 12.5px; color: var(--label); margin-bottom: 4px; }
+.prog-opts .field { margin-top: 4px; }
+.pad { padding: 14px 4px; margin: 0; }
+.pgroup { margin-top: 10px; }
+.pgroup-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 2px solid var(--line); font-weight: 700; }
+.pgroup-head .tiny, .pgroup-head .warn { margin: 0; font-weight: 400; }
+.ptable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ptable td { padding: 5px 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.ptable tr.on td { background: var(--accent-soft); }
+.ptable .c-chk { width: 24px; }
+.ptable .c-name { font-weight: 600; }
+.ptable .note { display: inline-block; max-width: 120px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; margin-left: 6px; font-size: 11px; font-weight: 400; color: var(--muted); }
+.ptable .lbl { font-size: 11px; color: var(--muted); }
+.ptable .c-last { color: var(--muted); font-size: 12px; }
+.ptable .c-prog { font-size: 11.5px; color: var(--muted); }
+.ptable .bar { display: inline-block; width: 44px; height: 6px; border-radius: 3px; background: var(--seg); overflow: hidden; vertical-align: middle; }
+.ptable .bar i { display: block; height: 100%; background: var(--green); }
+.ptable .c-act { text-align: right; }
+.ptable .c-act .btn { margin-left: 3px; padding: 3px 8px; }
+.btn.pass { border-color: var(--green); color: var(--green); font-weight: 600; }
+.btn.pass:hover { background: rgba(31,157,111,.1); }
+
 /* 교재 표지 */
 .books { padding: 6px 24px 8px; }
 .book-list { display: flex; align-items: flex-start; gap: 16px; overflow-x: auto; padding: 4px 4px 8px; }
@@ -224,6 +266,10 @@ button, input, select { font: inherit; color: inherit; }
 
 /* ===== 좁은 화면 ===== */
 @media (max-width: 960px) {
+  .prog { padding: 8px 16px 12px; }
+  .prog-grid { grid-template-columns: 1fr; }
+  .ptable td { white-space: normal; }
+  .ptable .c-prog { display: none; }
   .layout { display: block; }
   .top, .books { padding-left: 16px; padding-right: 16px; }
   .work { grid-template-columns: 1fr; grid-template-areas: "day" "count" "opts"; padding: 0 16px 16px; }
@@ -235,7 +281,7 @@ button, input, select { font: inherit; color: inherit; }
 @page { size: A4; margin: 0; }
 @media print {
   html, body { background: #fff; }
-  .top, .books, .work, .toolbar, .empty { display: none !important; }
+  .top, .books, .work, .prog, .toolbar, .empty { display: none !important; }
   .layout { display: block !important; }
   .preview { position: static !important; height: auto !important; border: 0 !important; background: #fff !important; }
   .preview-scroll { overflow: visible !important; padding: 0 !important; background: #fff !important; }
@@ -244,9 +290,7 @@ button, input, select { font: inherit; color: inherit; }
   .scaler { position: static !important; transform: none !important; }
   .pages { display: block; gap: 0; margin: 0; }
   .page { box-shadow: none; margin: 0; height: 296.5mm; break-after: page; page-break-after: always; break-inside: avoid; }
-  body.print-test #answerPages, body.print-answer #testPages { display: none; }
-  body.print-test #testPages .page:last-child,
-  body.print-answer #answerPages .page:last-child,
-  body.print-both #answerPages .page:last-child { break-after: auto; page-break-after: auto; }
+  body.print-test .page.answer, body.print-answer .page.test { display: none !important; }
+  .page.last-printed { break-after: auto; page-break-after: auto; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

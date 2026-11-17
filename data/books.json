@@ -1,6 +1,6 @@
 [
-  { "id": "wordmaster-2000", "title": "워드마스터 수능 2000", "short": "수능2000", "file": "data/wordmaster-2000.json", "cover": "data/covers/wordmaster-2000.jpg", "scope": "표제어만" },
-  { "id": "neungyule-suneung", "title": "능률VOCA 수능 필수", "short": "수능필수", "file": "data/neungyule-suneung.json", "cover": "data/covers/neungyule-suneung.jpg", "scope": "표제어만" },
-  { "id": "neungyule-eowon", "title": "능률VOCA 어원편 고등", "short": "어원편고등", "file": "data/neungyule-eowon.json", "cover": "data/covers/neungyule-eowon.jpg", "scope": "표제어+파생어" },
-  { "id": "vocaclear-suneung", "title": "보카클리어 수능편", "short": "보카클리어", "file": "data/vocaclear-suneung.json", "cover": "data/covers/vocaclear-suneung.jpg", "scope": "표제어만" }
+  { "id": "wordmaster-2000", "title": "워드마스터 수능 2000", "short": "수능2000", "file": "data/wordmaster-2000.json", "cover": "data/covers/wordmaster-2000.jpg", "scope": "표제어만", "maxDay": 50 },
+  { "id": "neungyule-suneung", "title": "능률VOCA 수능 필수", "short": "수능필수", "file": "data/neungyule-suneung.json", "cover": "data/covers/neungyule-suneung.jpg", "scope": "표제어만", "maxDay": 60 },
+  { "id": "neungyule-eowon", "title": "능률VOCA 어원편 고등", "short": "어원편고등", "file": "data/neungyule-eowon.json", "cover": "data/covers/neungyule-eowon.jpg", "scope": "표제어+파생어", "maxDay": 60 },
+  { "id": "vocaclear-suneung", "title": "보카클리어 수능편", "short": "보카클리어", "file": "data/vocaclear-suneung.json", "cover": "data/covers/vocaclear-suneung.jpg", "scope": "표제어만", "maxDay": 50 }
 ]

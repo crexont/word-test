@@ -295,23 +295,42 @@
   function buildQuestions(s, force) {
     var key = [state.bookId, selectedDaysSorted().join(','), s.meaning, s.spelling, s.mode].join('|');
     if (!force && key === state.questionKey && state.questions) return state.questions;
-    var pool = shuffle(wordPool());
-    // 섞은 목록의 앞쪽은 뜻 쓰기, 그다음은 스펠링 쓰기 → 같은 단어가 두 유형에 중복되지 않음
-    var meaning = pool.slice(0, s.meaning).map(function (w) { return { type: 'meaning', w: w }; });
-    var spelling = pool.slice(s.meaning, s.meaning + s.spelling).map(function (w) { return { type: 'spelling', w: w }; });
-    var qs = shuffle(meaning.concat(spelling)); // Day 구분 없이 무작위
-    if (s.mode === 'byday') {
-      // Day별로 무작위: Day 순서대로 묶고, 같은 Day 안에서는 섞인 순서 유지
-      var order = {};
-      state.book.days.forEach(function (d, i) { order[d.day] = i; });
-      qs = qs.map(function (q, i) { return { q: q, i: i }; })
-        .sort(function (a, b) { return (order[a.q.w.day] - order[b.q.w.day]) || (a.i - b.i); })
-        .map(function (x) { return x.q; });
-    }
-    qs.forEach(function (q, i) { q.no = i + 1; });
+    var qs = makeQuestions(wordPool(), s.meaning, s.spelling, s.mode);
     state.questions = qs;
     state.questionKey = key;
     return qs;
+  }
+
+  // pool: [{en, ko, day}] → 번호가 붙은 문항 목록
+  function makeQuestions(pool, nMeaning, nSpelling, mode) {
+    pool = shuffle(pool);
+    // 섞은 목록의 앞쪽은 뜻 쓰기, 그다음은 스펠링 쓰기 → 같은 단어가 두 유형에 중복되지 않음
+    var meaning = pool.slice(0, nMeaning).map(function (w) { return { type: 'meaning', w: w }; });
+    var spelling = pool.slice(nMeaning, nMeaning + nSpelling).map(function (w) { return { type: 'spelling', w: w }; });
+    var qs = shuffle(meaning.concat(spelling)); // Day 구분 없이 무작위
+    if (mode === 'byday') {
+      // Day별로 무작위: Day 순서대로 묶고, 같은 Day 안에서는 섞인 순서 유지
+      qs = qs.map(function (q, i) { return { q: q, i: i }; })
+        .sort(function (a, b) { return (a.q.w.day - b.q.w.day) || (a.i - b.i); })
+        .map(function (x) { return x.q; });
+    }
+    qs.forEach(function (q, i) { q.no = i + 1; });
+    return qs;
+  }
+
+  // 교재 데이터에서 days(Set)에 해당하는 단어 목록 (영어 단어 기준 중복 제거)
+  function poolFrom(bookData, daySet) {
+    var seen = new Set(), pool = [];
+    bookData.days.forEach(function (d) {
+      if (!daySet.has(d.day)) return;
+      d.words.forEach(function (w) {
+        var en = String(w[0] || '').trim(), ko = String(w[1] || '').trim();
+        if (!en || seen.has(en.toLowerCase())) return;
+        seen.add(en.toLowerCase());
+        pool.push({ en: en, ko: ko, day: d.day });
+      });
+    });
+    return pool;
   }
 
   // ---------- 페이지 나누기 ----------
@@ -409,8 +428,11 @@
     return cols;
   }
   // gap: 문항 사이 간격(em). 만들어진 페이지 수를 돌려준다
-  function renderTest(qs, s, title, gap) {
-    var container = $('testPages');
+  // opt: { into: 그릴 곳(기본 #testPages), name: 이름 칸에 미리 적을 이름, heading: Day 소제목 함수 }
+  function renderTest(qs, s, title, gap, opt) {
+    opt = opt || {};
+    var heading = opt.heading || unitHeading;
+    var container = opt.into || $('testPages');
     container.innerHTML = '';
     var total = qs.length;
     var dateText = formatDate(s.date);
@@ -431,12 +453,12 @@
           '</div>' +
           '<div class="sheet-info">' +
             '<div><span class="lbl">날짜</span><span>' + esc(dateText) + '</span></div>' +
-            '<div><span class="lbl">이름</span><span class="fill"></span></div>' +
+            '<div><span class="lbl">이름</span><span class="fill name">' + esc(opt.name || '') + '</span></div>' +
             '<div class="score"><span class="lbl">점수</span><span>/ ' + total + '</span></div>' +
           '</div>';
       } else {
         head.className = 'sheet-head cont';
-        head.innerHTML = '<span>' + esc(title) + '</span><span>이름: ______________</span>';
+        head.innerHTML = '<span>' + esc(title) + '</span><span>이름: ' + (opt.name ? esc(opt.name) : '______________') + '</span>';
       }
       page.appendChild(head);
       var body = document.createElement('div');
@@ -465,7 +487,7 @@
       if (s.mode === 'byday' && q.w.day !== lastDay) {
         var h = document.createElement('div');
         h.className = 'sec-head keep-next' + (lastDay !== null ? ' later' : '');
-        h.textContent = unitHeading(q.w.day);
+        h.textContent = heading(q.w.day);
         h.setAttribute('data-group', qs.filter(function (x) { return x.w.day === q.w.day; }).length);
         els.push(h);
         lastDay = q.w.day;
@@ -476,10 +498,13 @@
     return paginate(container, makePage, els).length;
   }
 
-  function renderAnswers(qs, s, title) {
-    var container = $('answerPages');
+  function renderAnswers(qs, s, title, opt) {
+    opt = opt || {};
+    var heading = opt.heading || unitHeading;
+    var container = opt.into || $('answerPages');
     container.innerHTML = '';
     var dateText = formatDate(s.date);
+    var sub = (opt.name ? opt.name + ' · ' : '') + title + (dateText ? ' · ' + dateText : '');
 
     function makePage(idx) {
       var page = document.createElement('div');
@@ -487,7 +512,7 @@
       var head = document.createElement('div');
       head.className = 'ans-head';
       head.innerHTML = '<span class="t">정답' + (idx > 0 ? ' (계속)' : '') + '</span>' +
-        '<span class="s">' + esc(title) + (dateText ? ' · ' + esc(dateText) : '') + '</span>';
+        '<span class="s">' + esc(sub) + '</span>';
       page.appendChild(head);
       var body = document.createElement('div');
       body.className = 'page-body';
@@ -517,7 +542,7 @@
     // Day별로 출제했으면 답지에 Day 구분을 넣어 채점하기 쉽게
     var lastDay = null;
     qs.forEach(function (q) {
-      if (s.mode === 'byday' && q.w.day !== lastDay) { secHead(unitHeading(q.w.day)); lastDay = q.w.day; }
+      if (s.mode === 'byday' && q.w.day !== lastDay) { secHead(heading(q.w.day)); lastDay = q.w.day; }
       aEl(q);
     });
 
@@ -550,6 +575,7 @@
     $('title').placeholder = autoTitle();
     $('titleReset').hidden = !state.titleEdited;
     save();
+    if (view === 'prog') return; // 진도표 화면에서는 미리보기를 건드리지 않음
 
     var msg = state.selected.size === 0 ? '왼쪽에서 시험에 낼 Day를 선택하세요.'
       : s.meaning + s.spelling === 0 ? '뜻 쓰기 또는 스펠링 쓰기 문항 수를 정하세요.' : '';
@@ -564,28 +590,346 @@
     renderTimer = setTimeout(function () { render(force); }, 60);
   }
   function render(force) {
+    if (view === 'prog') return;
     var s = readSettings();
     if (!state.book || s.meaning + s.spelling === 0 || state.selected.size === 0) return;
     var qs = buildQuestions(s, force);
     var title = s.title || autoTitle();
     $('scaler').style.transform = 'none';
-    // 가장 좁은 간격으로 만들 때의 페이지 수를 넘지 않는 범위에서, 가장 넓은 간격을 고른다
-    // (예: 80문항이면 1장에 들어가는 가장 넓은 간격)
-    var gaps = [1.5, 1.35, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7];
-    var minPages = renderTest(qs, s, title, gaps[gaps.length - 1]);
-    for (var i = 0; i < gaps.length - 1; i++) {
-      if (renderTest(qs, s, title, gaps[i]) <= minPages) break;
-    }
-    if (i === gaps.length - 1) renderTest(qs, s, title, gaps[i]);
-    renderAnswers(qs, s, title);
+    $('testPages').innerHTML = '';
+    $('answerPages').innerHTML = '';
+    renderTestFit(qs, s, title, { into: $('testPages') });
+    renderAnswers(qs, s, title, { into: $('answerPages') });
     fitPreview();
+  }
+
+  // 가장 좁은 간격으로 만들 때의 페이지 수를 넘지 않는 범위에서, 가장 넓은 간격을 고른다
+  // (예: 80문항이면 1장에 들어가는 가장 넓은 간격)
+  function renderTestFit(qs, s, title, opt) {
+    var gaps = [1.5, 1.35, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7];
+    var minPages = renderTest(qs, s, title, gaps[gaps.length - 1], opt);
+    for (var i = 0; i < gaps.length - 1; i++) {
+      if (renderTest(qs, s, title, gaps[i], opt) <= minPages) return;
+    }
+    renderTest(qs, s, title, gaps[gaps.length - 1], opt);
   }
 
   // ---------- 인쇄 ----------
   function doPrint(kind) {
     document.body.classList.remove('print-test', 'print-answer', 'print-both');
     document.body.classList.add('print-' + kind);
+    // 인쇄될 마지막 페이지 뒤에는 빈 페이지가 생기지 않도록 표시
+    qsa('.page.last-printed').forEach(function (p) { p.classList.remove('last-printed'); });
+    var pages = qsa('#scaler .page').filter(function (p) {
+      return kind === 'both' || (kind === 'test' ? p.classList.contains('test') : p.classList.contains('answer'));
+    });
+    if (pages.length) pages[pages.length - 1].classList.add('last-printed');
     window.print();
+  }
+
+  // =====================================================================
+  // 진도표 (구글 시트 연결)
+  // =====================================================================
+  var SHEET_KEY = 'wordTest.sheetUrl';
+  var VIEW_KEY = 'wordTest.view';
+  var prog = {
+    url: '',
+    data: null,          // { sheet, units:['1-2',...], rows:[{r, book, name, note, cells}] }
+    selected: new Set(), // 체크한 학생의 행 번호(r)
+    bookCache: {},       // 교재 id → 교재 데이터
+    qcache: {},          // 학생별 문항 (다시 섞기 전까지 유지)
+    busy: false
+  };
+  var view = 'gen';
+
+  function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 무시 */ } }
+
+  function getBookData(id) {
+    if (prog.bookCache[id]) return Promise.resolve(prog.bookCache[id]);
+    var info = state.books.find(function (b) { return b.id === id; });
+    return fetchJSON(info.file).then(function (d) {
+      d.days.sort(function (a, b) { return a.day - b.day; });
+      prog.bookCache[id] = d;
+      return d;
+    });
+  }
+
+  // 시트의 '교재' 칸 → books.json의 교재 (약칭·이름·id, 띄어쓰기·괄호 무시)
+  function keyOf(s) { return String(s || '').replace(/\(.*?\)/g, '').replace(/\s+/g, '').toLowerCase(); }
+  function matchBook(text) {
+    var k = keyOf(text);
+    if (!k) return null;
+    var exact = state.books.find(function (b) { return [b.short, b.title, b.id].some(function (x) { return keyOf(x) === k; }); });
+    if (exact) return exact;
+    return state.books.find(function (b) {
+      return [b.short, b.title].some(function (x) { var kx = keyOf(x); return kx && (k.indexOf(kx) >= 0 || kx.indexOf(k) >= 0); });
+    }) || null;
+  }
+  function parseUnit(label) {
+    var m = /^(\d+)(?:-(\d+))?$/.exec(label);
+    if (!m) return null;
+    var a = +m[1], b = m[2] ? +m[2] : a;
+    return { a: Math.min(a, b), b: Math.max(a, b), label: label };
+  }
+  function bookMaxDay(info) { return info && info.maxDay || 0; }
+
+  // 학생 한 줄의 상태: 교재, 교재 범위 안의 회차, 다음 범위, 마지막 통과
+  function studentInfo(row) {
+    var book = matchBook(row.book);
+    var units = prog.data.units.map(parseUnit).filter(Boolean);
+    var max = book ? bookMaxDay(book) : 0;
+    var inRange = units.filter(function (u) { return !max || u.a <= max; });
+    var next = null, last = null, done = 0;
+    inRange.forEach(function (u) {
+      var v = row.cells[u.label];
+      if (v) { last = { unit: u, date: v }; done++; }
+      else if (!next) next = u;
+    });
+    return { book: book, next: next, last: last, done: done, total: inRange.length };
+  }
+
+  function api(method, body) {
+    if (!prog.url) return Promise.reject(new Error('구글 시트 주소가 없습니다.'));
+    var opt = method === 'POST'
+      ? { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) }
+      : { method: 'GET' };
+    return fetch(prog.url + (method === 'GET' ? (prog.url.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now() : ''), opt)
+      .then(function (r) {
+        if (!r.ok) throw new Error('시트 응답 오류 (' + r.status + ')');
+        return r.json();
+      })
+      .then(function (j) {
+        if (!j || j.ok === false) throw new Error((j && j.error) || '시트 응답을 읽지 못했습니다.');
+        return j;
+      });
+  }
+
+  function setStatus(text, kind) {
+    var el = $('sheetStatus');
+    el.textContent = text;
+    el.className = 'tiny status ' + (kind || '');
+  }
+
+  function connectSheet() {
+    var url = $('sheetUrl').value.trim();
+    if (!/^https?:\/\//.test(url)) { setStatus('주소를 확인하세요 (https://script.google.com/... 로 시작).', 'err'); return; }
+    prog.url = url;
+    lsSet(SHEET_KEY, url);
+    loadSheet();
+  }
+
+  function loadSheet() {
+    if (!prog.url) { renderProgList(); return; }
+    setStatus('불러오는 중…');
+    $('progRefresh').disabled = true;
+    api('GET').then(function (j) {
+      prog.data = j;
+      // 시트에서 사라진 학생은 선택 해제
+      var rs = new Set(j.rows.map(function (x) { return x.r; }));
+      prog.selected.forEach(function (r) { if (!rs.has(r)) prog.selected.delete(r); });
+      setStatus('연결됨 · ' + j.sheet + ' · 학생 ' + j.rows.length + '명', 'ok');
+      $('sheetBox').classList.add('connected');
+      renderProgList();
+      renderBatchSoon();
+    }).catch(function (err) {
+      setStatus('불러오지 못했습니다: ' + err.message, 'err');
+      $('sheetBox').classList.remove('connected');
+    }).then(function () { $('progRefresh').disabled = false; });
+  }
+
+  function renderProgList() {
+    var box = $('progTable');
+    if (!prog.data) {
+      box.innerHTML = '<p class="muted pad">구글 시트를 연결하면 학생 목록이 나타납니다.</p>';
+      $('progCount').textContent = '';
+      return;
+    }
+    // 교재별로 묶기 (시트 순서 유지)
+    var groups = [], byKey = {};
+    prog.data.rows.forEach(function (row) {
+      var k = row.book || '(교재 없음)';
+      if (!byKey[k]) { byKey[k] = { name: k, rows: [] }; groups.push(byKey[k]); }
+      byKey[k].rows.push(row);
+    });
+    var html = '';
+    groups.forEach(function (g, gi) {
+      var info0 = studentInfo(g.rows[0]);
+      var allOn = g.rows.every(function (r) { return prog.selected.has(r.r); });
+      html += '<div class="pgroup">' +
+        '<div class="pgroup-head"><label class="check"><input type="checkbox" data-group="' + gi + '"' + (allOn ? ' checked' : '') + '> ' +
+        esc(info0.book ? (info0.book.short || info0.book.title) : g.name) + '</label>' +
+        (info0.book ? '<span class="tiny">' + esc(info0.book.title) + ' · ' + g.rows.length + '명</span>'
+                    : '<span class="warn">교재를 찾지 못했습니다: "' + esc(g.name) + '"</span>') +
+        '</div><table class="ptable"><tbody>';
+      g.rows.forEach(function (row) {
+        var st = studentInfo(row);
+        var on = prog.selected.has(row.r);
+        var nextTxt = !st.book ? '-' : st.next ? 'Day ' + st.next.label : (st.total ? '완료' : '-');
+        var lastTxt = st.last ? 'Day ' + st.last.unit.label + ' · ' + st.last.date : '기록 없음';
+        html += '<tr class="' + (on ? 'on' : '') + '">' +
+          '<td class="c-chk"><input type="checkbox" data-r="' + row.r + '"' + (on ? ' checked' : '') + (st.book && st.next ? '' : ' disabled') + '></td>' +
+          '<td class="c-name">' + esc(row.name) + (row.note ? '<span class="note" title="' + esc(row.note) + '">' + esc(row.note) + '</span>' : '') + '</td>' +
+          '<td class="c-next"><span class="lbl">다음</span> <b>' + esc(nextTxt) + '</b></td>' +
+          '<td class="c-last"><span class="lbl">최근</span> ' + esc(lastTxt) + '</td>' +
+          '<td class="c-prog"><span class="bar"><i style="width:' + (st.total ? Math.round(st.done / st.total * 100) : 0) + '%"></i></span> ' + st.done + '/' + st.total + '</td>' +
+          '<td class="c-act">' +
+            '<button type="button" class="btn small pass" data-pass="' + row.r + '"' + (st.book && st.next ? '' : ' disabled') + ' title="' + (st.next ? 'Day ' + esc(st.next.label) + ' 통과로 오늘 날짜 기록' : '') + '">통과 ✓</button>' +
+            '<button type="button" class="btn small undo" data-undo="' + row.r + '"' + (st.last ? '' : ' disabled') + ' title="마지막 통과 기록 지우기">↶</button>' +
+          '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+    });
+    box.innerHTML = html;
+    $('progCount').textContent = prog.selected.size ? '· ' + prog.selected.size + '명 선택' : '';
+
+    // 이벤트
+    qsa('#progTable input[data-r]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var r = +cb.getAttribute('data-r');
+        if (cb.checked) prog.selected.add(r); else prog.selected.delete(r);
+        renderProgList(); renderBatchSoon();
+      });
+    });
+    qsa('#progTable input[data-group]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var g = groups[+cb.getAttribute('data-group')];
+        g.rows.forEach(function (row) {
+          var st = studentInfo(row);
+          if (cb.checked && st.book && st.next) prog.selected.add(row.r); else prog.selected.delete(row.r);
+        });
+        renderProgList(); renderBatchSoon();
+      });
+    });
+    qsa('#progTable [data-pass]').forEach(function (b) {
+      b.addEventListener('click', function () { markPass(+b.getAttribute('data-pass'), false); });
+    });
+    qsa('#progTable [data-undo]').forEach(function (b) {
+      b.addEventListener('click', function () { markPass(+b.getAttribute('data-undo'), true); });
+    });
+  }
+
+  function markPass(r, undo) {
+    if (prog.busy) return;
+    var row = prog.data.rows.find(function (x) { return x.r === r; });
+    var st = studentInfo(row);
+    var unit = undo ? (st.last && st.last.unit) : st.next;
+    if (!unit) return;
+    if (undo && !confirm(row.name + ' — Day ' + unit.label + ' 통과 기록(' + st.last.date + ')을 지울까요?')) return;
+    prog.busy = true;
+    setStatus((undo ? '기록 지우는 중… ' : '기록하는 중… ') + row.name + ' Day ' + unit.label);
+    api('POST', { action: 'set', r: r, name: row.name, unit: unit.label, clear: !!undo }).then(function (j) {
+      row.cells[unit.label] = undo ? '' : j.value;
+      setStatus((undo ? '지움: ' : '통과 기록: ') + row.name + ' Day ' + unit.label + (undo ? '' : ' (' + j.value + ')'), 'ok');
+      renderProgList();
+      renderBatchSoon();
+    }).catch(function (err) {
+      setStatus('기록하지 못했습니다: ' + err.message, 'err');
+    }).then(function () { prog.busy = false; });
+  }
+
+  function progSettings() {
+    return {
+      type: radioValue('progType') || 'meaning',
+      mode: radioValue('progMode') || 'random',
+      ans: radioValue('progAns') || 'each',
+      date: $('progDate').value,
+      hint: false,
+      fontSize: 14,
+      columns: 3
+    };
+  }
+
+  var batchTimer = null;
+  function renderBatchSoon(force) {
+    clearTimeout(batchTimer);
+    batchTimer = setTimeout(function () { renderBatch(force); }, 80);
+  }
+
+  // 선택한 학생들의 시험지를 학생 순서대로 이어서 만든다
+  function renderBatch(force) {
+    if (view !== 'prog') return;
+    var ps = progSettings();
+    var rows = prog.data ? prog.data.rows.filter(function (x) { return prog.selected.has(x.r); }) : [];
+    var jobs = rows.map(function (row) { return { row: row, st: studentInfo(row) }; })
+      .filter(function (j) { return j.st.book && j.st.next; });
+    var msg = !prog.data ? '구글 시트를 연결하고 학생을 체크하면 시험지가 여기에 나타납니다.'
+      : !jobs.length ? '학생을 체크하면 각자 다음 범위의 시험지가 여기에 나타납니다.' : '';
+    $('emptyMsg').textContent = msg;
+    $('emptyMsg').hidden = !msg;
+    $('previewArea').hidden = !!msg;
+    qsa('.toolbar button').forEach(function (b) { b.disabled = !!msg; });
+    if (msg) { $('testPages').innerHTML = ''; $('answerPages').innerHTML = ''; return; }
+
+    Promise.all(jobs.map(function (j) { return getBookData(j.st.book.id); })).then(function (datas) {
+      if (view !== 'prog') return;
+      $('scaler').style.transform = 'none';
+      var testBox = $('testPages'), ansBox = $('answerPages');
+      testBox.innerHTML = ''; ansBox.innerHTML = '';
+      jobs.forEach(function (j, i) {
+        var data = datas[i], u = j.st.next;
+        var days = new Set();
+        data.days.forEach(function (d) { if (d.day >= u.a && d.day <= u.b) days.add(d.day); });
+        var pool = poolFrom(data, days);
+        var n = pool.length;
+        var nm = ps.type === 'meaning' ? n : ps.type === 'spelling' ? 0 : Math.ceil(n / 2);
+        var key = [j.row.r, j.row.name, j.st.book.id, u.label, ps.type, ps.mode].join('|');
+        if (force || !prog.qcache[key]) prog.qcache[key] = makeQuestions(pool, nm, n - nm, ps.mode);
+        var qs = prog.qcache[key];
+        var title = (j.st.book.short || j.st.book.title) + ' Day ' + u.label;
+        var s = { date: ps.date, hint: false, fontSize: 14, columns: 3, mode: ps.mode };
+        var heading = function (d) { return 'Day ' + d; };
+        var tw = document.createElement('div'); tw.className = 'student-set';
+        testBox.appendChild(tw);
+        renderTestFit(qs, s, title, { into: tw, name: j.row.name, heading: heading });
+        var aw = document.createElement('div'); aw.className = 'student-set';
+        (ps.ans === 'each' ? testBox : ansBox).appendChild(aw);
+        renderAnswers(qs, s, title, { into: aw, name: j.row.name, heading: heading });
+      });
+      fitPreview();
+    }).catch(function (err) {
+      $('emptyMsg').textContent = '교재 데이터를 불러오지 못했습니다: ' + err.message;
+      $('emptyMsg').hidden = false;
+    });
+  }
+
+  function setView(v) {
+    view = v === 'prog' ? 'prog' : 'gen';
+    lsSet(VIEW_KEY, view);
+    qsa('.tabs [data-view]').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-view') === view); });
+    document.body.classList.toggle('view-prog', view === 'prog');
+    $('progView').hidden = view !== 'prog';
+    if (view === 'prog') {
+      renderProgList();
+      renderBatch();
+    } else {
+      $('testPages').innerHTML = ''; $('answerPages').innerHTML = '';
+      if (state.book) update(); else {
+        $('emptyMsg').textContent = '교재를 고르면 여기에 시험지 미리보기가 나타납니다.';
+        $('emptyMsg').hidden = false;
+        $('previewArea').hidden = true;
+        qsa('.toolbar button').forEach(function (b) { b.disabled = true; });
+      }
+    }
+  }
+
+  function bindProgress() {
+    qsa('.tabs [data-view]').forEach(function (b) {
+      b.addEventListener('click', function () { setView(b.getAttribute('data-view')); });
+    });
+    $('sheetConnect').addEventListener('click', connectSheet);
+    $('sheetUrl').addEventListener('keydown', function (e) { if (e.key === 'Enter') connectSheet(); });
+    $('sheetEdit').addEventListener('click', function () { $('sheetBox').classList.remove('connected'); $('sheetUrl').focus(); });
+    $('progRefresh').addEventListener('click', loadSheet);
+    $('progNone').addEventListener('click', function () { prog.selected.clear(); renderProgList(); renderBatchSoon(); });
+    $('progShuffle').addEventListener('click', function () { renderBatchSoon(true); });
+    qsa('input[name="progType"], input[name="progMode"], input[name="progAns"]').forEach(function (el) {
+      el.addEventListener('change', function () { renderBatchSoon(); });
+    });
+    $('progDate').addEventListener('change', function () { renderBatchSoon(); });
+    $('progDate').value = todayStr();
+    prog.url = lsGet(SHEET_KEY);
+    $('sheetUrl').value = prog.url;
   }
   window.addEventListener('afterprint', function () {
     document.body.classList.remove('print-test', 'print-answer', 'print-both');
@@ -656,7 +1000,7 @@
       el.addEventListener('change', function () { update(); });
     });
     ['shuffleBtn', 'shuffleBtn2'].forEach(function (id) {
-      $(id).addEventListener('click', function () { update(null, true); });
+      $(id).addEventListener('click', function () { if (view === 'prog') renderBatchSoon(true); else update(null, true); });
     });
     qsa('[data-print]').forEach(function (b) {
       b.addEventListener('click', function () { doPrint(b.getAttribute('data-print')); });
@@ -674,9 +1018,12 @@
     applySaved(sv);
     $('date').value = todayStr();
     bind();
+    bindProgress();
     fetchJSON('data/books.json').then(function (books) {
       state.books = Array.isArray(books) ? books : [];
       renderBooks();
+      setView(lsGet(VIEW_KEY) || 'gen');
+      if (prog.url) loadSheet();
       var saved = sv.bookId && state.books.some(function (b) { return b.id === sv.bookId; }) ? sv.bookId : null;
       if (saved) return loadBook(saved, sv.days || []);
     }).catch(function (err) {

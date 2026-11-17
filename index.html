@@ -8,7 +8,7 @@
   // 저장된 화면 모드를 먼저 적용해 깜빡임 방지
   try { var t = localStorage.getItem('wordTest.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
 </script>
-<link rel="stylesheet" href="style.css?v=20261118m">
+<link rel="stylesheet" href="style.css?v=20261118o">
 </head>
 <body>
 <div class="layout">
@@ -16,8 +16,71 @@
   <div class="left">
     <header class="top">
       <h1>영어 단어 시험지 생성기</h1>
+      <nav class="tabs">
+        <button type="button" data-view="gen" class="active">시험지 만들기</button>
+        <button type="button" data-view="prog">진도표</button>
+      </nav>
+      <span class="spacer"></span>
       <button type="button" class="theme-btn" id="themeBtn" aria-label="화면 모드 바꾸기">🌙 다크 모드</button>
     </header>
+
+    <!-- 진도표 화면 -->
+    <div class="prog" id="progView" hidden>
+      <div class="block sheet-box" id="sheetBox">
+        <div class="block-head">
+          <h2>구글 시트 연결</h2>
+          <span class="tiny status" id="sheetStatus"></span>
+          <button type="button" class="link-btn when-connected" id="sheetEdit">주소 변경</button>
+        </div>
+        <div class="field-row when-disconnected">
+          <label class="field grow">Apps Script 웹 앱 주소
+            <input type="url" id="sheetUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false">
+          </label>
+          <button type="button" class="btn primary" id="sheetConnect">연결</button>
+        </div>
+        <p class="tiny when-disconnected">주소는 이 컴퓨터의 브라우저에만 저장됩니다. 설정 방법은 README의 "진도표(구글 시트) 연결"을 보세요.</p>
+      </div>
+
+      <div class="prog-grid">
+        <div class="block prog-opts">
+          <div class="block-head">
+            <h2>인쇄 설정</h2>
+            <button type="button" class="btn small shuffle-btn" id="progShuffle">🔀 다시 섞기</button>
+          </div>
+          <div class="opt-col"><span>문항</span>
+            <div class="seg seg-full">
+              <label><input type="radio" name="progType" value="meaning" checked><span>뜻</span></label>
+              <label><input type="radio" name="progType" value="spelling"><span>스펠링</span></label>
+              <label><input type="radio" name="progType" value="half"><span>반반</span></label>
+            </div>
+          </div>
+          <div class="opt-col"><span>배치</span>
+            <div class="seg seg-full">
+              <label><input type="radio" name="progMode" value="random" checked><span>섞기</span></label>
+              <label><input type="radio" name="progMode" value="byday"><span>Day별로</span></label>
+            </div>
+          </div>
+          <div class="opt-col"><span>답지</span>
+            <div class="seg seg-full">
+              <label><input type="radio" name="progAns" value="each" checked><span>학생마다</span></label>
+              <label><input type="radio" name="progAns" value="end"><span>맨 뒤에</span></label>
+            </div>
+          </div>
+          <label class="field">날짜<input type="date" id="progDate"></label>
+        </div>
+
+        <div class="block prog-list">
+          <div class="block-head">
+            <h2>학생 <span class="accent" id="progCount"></span></h2>
+            <div class="head-btns">
+              <button type="button" class="btn small" id="progRefresh">↻ 새로고침</button>
+              <button type="button" class="btn small" id="progNone">선택 해제</button>
+            </div>
+          </div>
+          <div id="progTable"></div>
+        </div>
+      </div>
+    </div>
 
     <section class="books">
       <div id="bookList" class="book-list"><p class="muted">교재 목록을 불러오는 중…</p></div>
@@ -109,6 +172,6 @@
   </main>
 </div>
 
-<script src="app.js?v=20261118m"></script>
+<script src="app.js?v=20261118o"></script>
 </body>
 </html>
