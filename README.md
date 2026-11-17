@@ -35,7 +35,7 @@
 
    ```json
    [
-     { "id": "sample", "title": "예시 단어장", "file": "data/sample.json" },
+     { "id": "wordmaster-2000", "title": "워드마스터 수능 2000", "short": "수능2000", "file": "data/wordmaster-2000.json", "cover": "data/covers/wordmaster-2000.jpg" },
      { "id": "voca-basic", "title": "기본 영단어", "file": "data/voca-basic.json" }
    ]
    ```
