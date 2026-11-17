@@ -129,8 +129,21 @@
   function autoTitle() {
     if (!state.book) return '';
     var days = selectedDaysSorted();
-    // 예: "수능2000 Day 1-2" (books.json의 short가 있으면 약칭 사용)
-    return (state.book.short || state.book.title) + (days.length ? ' Day ' + rangeText(days) : '');
+    // 예: "수능2000 Day 1-2", 부록이 섞이면 "어원편 Day 1-2, 부록1" (books.json의 short가 있으면 약칭 사용)
+    var nums = days.filter(function (d) { return !unitInfo(d).label; });
+    var labels = days.filter(function (d) { return unitInfo(d).label; }).map(function (d) { return unitInfo(d).label; });
+    var parts = [];
+    if (nums.length) parts.push('Day ' + rangeText(nums));
+    if (labels.length) parts.push(labels.join(', '));
+    return (state.book.short || state.book.title) + (parts.length ? ' ' + parts.join(', ') : '');
+  }
+  // 단원 정보: 일반 Day는 {}, 부록 등은 {label:'부록1', name:'혼동어휘 1'}
+  function unitInfo(day) {
+    return (state.dayInfo && state.dayInfo[day]) || {};
+  }
+  function unitHeading(day) {
+    var u = unitInfo(day);
+    return u.name || u.label || 'Day ' + day;
   }
 
   // ---------- 교재 ----------
@@ -172,6 +185,10 @@
       state.bookId = id;
       state.book = { title: data.title || info.title, short: info.short || '', days: (data.days || []).slice() };
       state.book.days.sort(function (a, b) { return a.day - b.day; });
+      state.dayInfo = {};
+      state.book.days.forEach(function (d) {
+        if (d.label || d.name) state.dayInfo[d.day] = { label: d.label || '', name: d.name || '' };
+      });
       state.selected = new Set();
       if (restoreDays) {
         var valid = new Set(state.book.days.map(function (d) { return d.day; }));
@@ -199,8 +216,9 @@
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'day-btn' + (state.selected.has(d.day) ? ' on' : '');
-      btn.title = 'Day ' + d.day + ' (' + d.words.length + '단어)';
-      btn.innerHTML = d.day + '<small>' + d.words.length + '</small>';
+      btn.title = unitHeading(d.day) + ' (' + d.words.length + '단어)';
+      btn.innerHTML = esc(d.label || d.day) + '<small>' + d.words.length + '</small>';
+      if (d.label) btn.classList.add('extra');
       btn.addEventListener('click', function (e) { onDayClick(idx, e.shiftKey); });
       grid.appendChild(btn);
     });
@@ -454,7 +472,7 @@
       if (s.mode === 'byday' && q.w.day !== lastDay) {
         var h = document.createElement('div');
         h.className = 'sec-head keep-next' + (lastDay !== null ? ' later' : '');
-        h.textContent = 'Day ' + q.w.day;
+        h.textContent = unitHeading(q.w.day);
         h.setAttribute('data-group', qs.filter(function (x) { return x.w.day === q.w.day; }).length);
         els.push(h);
         lastDay = q.w.day;
@@ -509,7 +527,7 @@
     // Day별로 출제했으면 답지에 Day 구분을 넣어 채점하기 쉽게
     var lastDay = null;
     qs.forEach(function (q) {
-      if (s.mode === 'byday' && q.w.day !== lastDay) { secHead('Day ' + q.w.day); lastDay = q.w.day; }
+      if (s.mode === 'byday' && q.w.day !== lastDay) { secHead(unitHeading(q.w.day)); lastDay = q.w.day; }
       aEl(q);
     });
 

@@ -99,6 +99,7 @@ button, input, select { font: inherit; color: inherit; }
 .day-btn:hover { border-color: var(--accent); }
 .day-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .day-btn.on small { color: #d5e0ff; }
+.day-btn.extra { font-size: 11.5px; letter-spacing: -0.3px; }
 
 .count-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; }
 .type-name { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; }
