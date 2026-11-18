@@ -336,3 +336,22 @@ body.view-prog.pmode-sheet .layout { grid-template-columns: minmax(0, 1fr); }
 .sheet-status .status { flex: 1; margin: 0; min-width: 200px; }
 .sheet-status .admin-key { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
 .sheet-status .admin-key input { width: 180px; border: 1px solid var(--line); border-radius: 7px; padding: 4px 8px; background: var(--surface); color: var(--text); font-size: 13px; }
+
+/* 점수 기록 */
+.ptable .c-score { width: 92px; }
+.ptable .c-score input.score { width: 52px; border: 1px solid var(--accent); border-radius: 6px; padding: 2px 5px; font-size: 13px; background: var(--surface); color: var(--text); text-align: right; }
+.ptable .retest { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 5px; font-size: 11px; font-weight: 700; background: #fde2e1; color: #b42318; }
+:root[data-theme="dark"] .ptable .retest { background: #4a1f1d; color: #ff9a92; }
+.pass-rate { width: 56px; border: 1px solid var(--line); border-radius: 7px; padding: 4px 6px; background: var(--surface); color: var(--text); text-align: right; }
+
+/* 학생 목록: 묶음이 달라도 칸 위치가 같게 (최근 칸이 남는 폭을 씀) */
+.ptable { table-layout: fixed; }
+.ptable .c-chk { width: 26px; }
+.ptable .c-name { width: 104px; overflow: hidden; text-overflow: ellipsis; }
+.ptable .c-cnt { width: 52px; }
+.ptable .c-next { width: 100px; }
+.ptable .c-last { width: auto; overflow: hidden; text-overflow: ellipsis; }
+.ptable .c-prog { width: 76px; }
+.ptable .c-score { width: 86px; }
+.ptable .c-act { width: 106px; }
+@media (max-width: 960px) { .ptable { table-layout: auto; } }

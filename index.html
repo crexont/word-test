@@ -8,7 +8,7 @@
   // 저장된 화면 모드를 먼저 적용해 깜빡임 방지
   try { var t = localStorage.getItem('wordTest.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
 </script>
-<link rel="stylesheet" href="style.css?v=20261119b">
+<link rel="stylesheet" href="style.css?v=20261119e">
 </head>
 <body>
 <div class="layout">
@@ -81,6 +81,7 @@
             </div>
           </div>
           <label class="field">날짜<input type="date" id="progDate"></label>
+          <div class="opt-row"><span>통과 기준</span><span><input type="number" id="progPass" min="1" max="100" value="90" class="pass-rate"> %</span></div>
           <label class="switch duplex"><input type="checkbox" id="progDuplex" checked><span class="knob"></span><span>양면 인쇄 <small class="tiny">답지·다음 학생은 새 장에서</small></span></label>
         </div>
 
@@ -89,6 +90,7 @@
             <h2>학생 <span class="accent" id="progCount"></span></h2>
             <div class="head-btns">
               <button type="button" class="btn small admin-only" id="stuAdd" hidden>＋ 학생 추가</button>
+              <button type="button" class="btn small primary" id="recordSel" hidden title="체크한 학생의 점수를 기록 (빈칸은 통과)">✓ 선택 학생 기록</button>
               <button type="button" class="btn small" id="progRefresh">↻ 새로고침</button>
               <button type="button" class="btn small" id="progNone">선택 해제</button>
             </div>
@@ -218,6 +220,6 @@
   <option value="중1"><option value="중2"><option value="중3"><option value="고1"><option value="고2"><option value="고3">
 </datalist>
 
-<script src="app.js?v=20261119b"></script>
+<script src="app.js?v=20261119e"></script>
 </body>
 </html>

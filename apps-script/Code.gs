@@ -17,7 +17,7 @@
 var SHEET_NAME = '';
 
 // 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭, 6: 관리 기능 안정화, 7: 서식 유지, 8: 교재 색을 사이트에서 지정, 9: 시트 보기 좋게)
-var VERSION = 11;
+var VERSION = 12;
 
 // 진도표 '교재' 칸 색 (교재 약칭 기준, 띄어쓰기 무시). 여기 없는 교재는 원래 칠해 둔 색을 유지합니다.
 var BOOK_COLORS = {
@@ -41,6 +41,7 @@ function doPost(e) {
   return run_(function () {
     var req = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (req.action === 'set') return set_(req);
+    if (req.action === 'record') return record_(req);
     if (req.action === 'list') return list_();
     if (Object.prototype.hasOwnProperty.call(ADMIN_ACTIONS, req.action)) {
       checkKey_(req.key);
@@ -96,6 +97,7 @@ function list_() {
   var values = sh.getDataRange().getDisplayValues();
   var L = layout_(values);
   var rows = [], book = '', grade = '';
+  var logs = lastLogs_();
   for (var r = L.firstDataRow; r < values.length; r++) {
     var row = values[r];
     if (L.iGrade >= 0 && String(row[L.iGrade]).trim()) grade = String(row[L.iGrade]).trim();
@@ -104,7 +106,7 @@ function list_() {
     if (!name) continue;
     var cells = {};
     L.units.forEach(function (u) { cells[u.label] = String(row[u.col] || '').trim(); });
-    rows.push({ r: r + 1, grade: grade, book: book, name: name, note: L.iNote >= 0 ? String(row[L.iNote] || '').trim() : '', cells: cells });
+    rows.push({ r: r + 1, log: logs[name + '|' + book.replace(/\s+/g, '')] || null, grade: grade, book: book, name: name, note: L.iNote >= 0 ? String(row[L.iNote] || '').trim() : '', cells: cells });
   }
   return { ok: true, version: VERSION, sheet: sh.getName(), units: L.units.map(function (u) { return u.label; }), rows: rows };
 }
@@ -509,3 +511,66 @@ ADMIN_ACTIONS.importBook = function (req) {
     return { ok: true, tab: tab, rows: rows.length };
   });
 };
+
+// =====================================================================
+// 시험 기록 ('기록' 탭): 날짜 | 학년 | 교재 | 이름 | 범위 | 점수 | 만점 | 결과
+//  - 통과면 진도표 Day 칸에 오늘 날짜를 이어 적고, 재시험이면 Day 칸은 그대로
+// =====================================================================
+var LOG_SHEET = '기록';
+
+function logSheet_(create) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var lg = ss.getSheetByName(LOG_SHEET);
+  if (!lg && create) {
+    lg = ss.insertSheet(LOG_SHEET, 1);
+    lg.getRange(1, 1, 1, 8).setValues([['날짜', '학년', '교재', '이름', '범위', '점수', '만점', '결과']])
+      .setFontWeight('bold').setBackground('#1f3864').setFontColor('#ffffff').setHorizontalAlignment('center');
+    lg.setFrozenRows(1);
+    [110, 50, 100, 80, 90, 50, 50, 60].forEach(function (w, i) { lg.setColumnWidth(i + 1, w); });
+    var res = lg.getRange('H2:H');
+    lg.setConditionalFormatRules([
+      SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('재시험').setBackground('#f4cccc').setFontColor('#990000').setRanges([res]).build(),
+      SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('통과').setBackground('#d9ead3').setRanges([res]).build()
+    ]);
+  }
+  return lg;
+}
+
+// 학생별 마지막 기록 { '이름|교재': {date, range, score, total, result} }
+function lastLogs_() {
+  var lg = logSheet_(false), out = {};
+  if (!lg) return out;
+  var v = lg.getDataRange().getDisplayValues();
+  for (var i = 1; i < v.length; i++) {
+    var name = String(v[i][3] || '').trim(), book = String(v[i][2] || '').trim();
+    if (!name) continue;
+    out[name + '|' + book.replace(/\s+/g, '')] = { date: v[i][0], range: v[i][4], score: v[i][5], total: v[i][6], result: v[i][7] };
+  }
+  return out;
+}
+
+// req: { r, name, units: ['7','8'], range: '7-8', score, total, pass }
+function record_(req) {
+  return withLock_(function () {
+    var sh = sheet_(), T = table_(sh), L = T.L;
+    var row = T.rows[findIdx_(T, req)];
+    var tz = Session.getScriptTimeZone(), now = new Date();
+    var date = Utilities.formatDate(now, tz, 'M/d');
+    var values = {};
+    if (req.pass) {
+      (req.units || []).forEach(function (label) {
+        var u = L.units.filter(function (x) { return x.label === norm_(label); })[0];
+        if (!u) throw new Error('Day 칸을 찾지 못했습니다: ' + label);
+        var cell = sh.getRange(row.r, u.col + 1);
+        var parts = String(cell.getDisplayValue() || '').split(/[,\n]/).map(function (s) { return s.trim(); }).filter(String);
+        parts.push(date);
+        values[label] = parts.join(', ');
+        cell.setNumberFormat('@').setValue(values[label]);
+      });
+    }
+    var score = req.score === '' || req.score == null ? '' : Number(req.score);
+    logSheet_(true).appendRow([Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'), row.grade, row.book, row.name,
+      'Day ' + String(req.range || ''), score, req.total || '', req.pass ? '통과' : '재시험']);
+    return { ok: true, date: date, values: values };
+  });
+}
