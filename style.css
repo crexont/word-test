@@ -415,5 +415,5 @@ body.view-prog.pmode-sheet .layout { grid-template-columns: minmax(0, 1fr); }
 .btn.retest-btn.on { background: #d9534f; color: #fff; }
 @media print { .sp-table td.re { background: #f4cccc; color: #990000; font-size: 5.6pt; letter-spacing: -0.3pt; } }
 
-/* 진도표 화면은 화면 폭을 다 씀 (학생 목록 칸이 넉넉하게) */
-body.view-prog .layout { max-width: none; }
+/* 진도표 화면은 조금 더 넓게 (학생 목록이 잘리지 않을 만큼) */
+body.view-prog .layout { max-width: 1640px; }
