@@ -1101,6 +1101,9 @@
   function adminCall(body) {
     body.key = prog.adminKey;
     body.maxDays = maxDaysMap();
+    // 진도표 '교재' 칸 색 (books.json의 sheetColor)
+    body.bookColors = {};
+    state.books.forEach(function (b) { if (b.sheetColor) { body.bookColors[b.short || b.title] = b.sheetColor; body.bookColors[b.title] = b.sheetColor; } });
     return api('POST', body);
   }
   function saveStudent() {

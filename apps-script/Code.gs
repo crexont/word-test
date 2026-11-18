@@ -16,13 +16,13 @@
 // 진도표가 있는 시트(탭) 이름. 비워 두면 첫 번째 시트를 씁니다.
 var SHEET_NAME = '';
 
-// 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭, 6: 관리 기능 안정화, 7: 서식 유지)
-var VERSION = 7;
+// 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭, 6: 관리 기능 안정화, 7: 서식 유지, 8: 교재 색을 사이트에서 지정)
+var VERSION = 8;
 
 // 진도표 '교재' 칸 색 (교재 약칭 기준, 띄어쓰기 무시). 여기 없는 교재는 원래 칠해 둔 색을 유지합니다.
 var BOOK_COLORS = {
   '수능2000': '#f4b183',   // 연주황
-  '어원편고등': '#f4b183', // 연주황
+  '어원편고등': '#e46c0a', // 짙은 주황
   '보카클리어': '#f4a6a6', // 연한 빨강
   '수능필수': '#c6e0b4'    // 연초록
 };
@@ -44,6 +44,7 @@ function doPost(e) {
     if (req.action === 'list') return list_();
     if (Object.prototype.hasOwnProperty.call(ADMIN_ACTIONS, req.action)) {
       checkKey_(req.key);
+      useColors_(req);
       return ADMIN_ACTIONS[req.action](req);
     }
     throw new Error('알 수 없는 요청입니다.');
@@ -213,9 +214,16 @@ function placeIdx_(rows, grade, book) {
   return rows.length;
 }
 
+// 교재 칸 색: 사이트가 보낸 색(books.json의 sheetColor) → 이 파일의 BOOK_COLORS → 없음
+var EXTRA_COLORS_ = null;
 function bookColor_(book) {
   var k = String(book || '').replace(/\(.*?\)/g, '').replace(/\s+/g, '');
-  return BOOK_COLORS[k] || null;
+  return (EXTRA_COLORS_ && EXTRA_COLORS_[k]) || BOOK_COLORS[k] || null;
+}
+function useColors_(req) {
+  EXTRA_COLORS_ = {};
+  var m = (req && req.bookColors) || {};
+  Object.keys(m).forEach(function (name) { EXTRA_COLORS_[String(name).replace(/\(.*?\)/g, '').replace(/\s+/g, '')] = m[name]; });
 }
 
 function setRow_(T, row, grade, book) {
