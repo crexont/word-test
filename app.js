@@ -181,7 +181,12 @@
     var info = state.books.find(function (b) { return b.id === id; });
     if (!info) return Promise.resolve(false);
     qsa('.book-card').forEach(function (el, i) { el.classList.toggle('active', state.books[i].id === id); });
-    return fetchJSON(info.file).then(function (data) {
+    if (info.sheet && prog.url && !prog.bookCache[id]) {
+      $('emptyMsg').textContent = '단어장을 불러오는 중…';
+      $('emptyMsg').hidden = false;
+      $('previewArea').hidden = true;
+    }
+    return getBookData(id).then(function (data) {
       var changed = state.bookId !== id;
       state.bookId = id;
       state.book = { title: data.title || info.title, short: info.short || '', days: (data.days || []).slice() };
@@ -204,7 +209,12 @@
       update();
       return true;
     }).catch(function (err) {
-      alert('교재 파일을 불러오지 못했습니다: ' + err.message);
+      state.pendingBook = { id: id, days: restoreDays };
+      if (view !== 'prog') {
+        $('emptyMsg').textContent = bookErrorText(err);
+        $('emptyMsg').hidden = false;
+        $('previewArea').hidden = true;
+      }
       return false;
     });
   }
@@ -645,14 +655,38 @@
   function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 무시 */ } }
 
+  // 교재 단어 데이터 (한 번 받으면 이 페이지에서는 다시 받지 않음)
+  //  - books.json에 sheet(구글 시트의 단어장 탭 이름)가 있으면 Apps Script에서 받는다 (단어는 공개 저장소에 없음)
+  //  - 없으면 file(JSON)에서 받는다
+  var bookLoading = {};
   function getBookData(id) {
     if (prog.bookCache[id]) return Promise.resolve(prog.bookCache[id]);
+    if (bookLoading[id]) return bookLoading[id];
     var info = state.books.find(function (b) { return b.id === id; });
-    return fetchJSON(info.file).then(function (d) {
+    var p;
+    if (info.sheet) {
+      if (!prog.url) return Promise.reject(new Error('NO_SHEET'));
+      p = fetch(prog.url + (prog.url.indexOf('?') >= 0 ? '&' : '?') + 'action=book&tab=' + encodeURIComponent(info.sheet))
+        .then(function (r) { if (!r.ok) throw new Error('시트 응답 오류 (' + r.status + ')'); return r.json(); })
+        .then(function (j) {
+          if (!j || j.ok === false) throw new Error((j && j.error) || '단어장을 읽지 못했습니다.');
+          return { title: info.title, days: j.days };
+        });
+    } else {
+      p = fetchJSON(info.file);
+    }
+    bookLoading[id] = p.then(function (d) {
       d.days.sort(function (a, b) { return a.day - b.day; });
       prog.bookCache[id] = d;
+      delete bookLoading[id];
       return d;
-    });
+    }, function (err) { delete bookLoading[id]; throw err; });
+    return bookLoading[id];
+  }
+  function bookErrorText(err) {
+    return err.message === 'NO_SHEET'
+      ? '단어장은 구글 시트에 있습니다. 위쪽 "진도표" 탭에서 구글 시트를 먼저 연결하세요.'
+      : '교재 단어를 불러오지 못했습니다: ' + err.message;
   }
 
   // 시트의 '교재' 칸 → books.json의 교재 (약칭·이름·id, 띄어쓰기·괄호 무시)
@@ -1000,7 +1034,7 @@
       });
       fitPreview();
     }).catch(function (err) {
-      $('emptyMsg').textContent = '교재 데이터를 불러오지 못했습니다: ' + err.message;
+      $('emptyMsg').textContent = bookErrorText(err);
       $('emptyMsg').hidden = false;
     });
   }
@@ -1079,7 +1113,10 @@
       renderBatch();
     } else {
       $('testPages').innerHTML = ''; $('answerPages').innerHTML = '';
-      if (state.book) update(); else {
+      if (!state.book && state.pendingBook && prog.url) {
+        var pb = state.pendingBook; state.pendingBook = null;
+        loadBook(pb.id, pb.days);
+      } else if (state.book) update(); else {
         $('emptyMsg').textContent = '교재를 고르면 여기에 시험지 미리보기가 나타납니다.';
         $('emptyMsg').hidden = false;
         $('previewArea').hidden = true;

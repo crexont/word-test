@@ -16,13 +16,17 @@
 // 진도표가 있는 시트(탭) 이름. 비워 두면 첫 번째 시트를 씁니다.
 var SHEET_NAME = '';
 
-// 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능)
-var VERSION = 4;
+// 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭)
+var VERSION = 5;
 
 var UNIT_RE = /^\d+\s*[-~]\s*\d+$|^\d+$/;
 
 function doGet(e) {
-  return run_(function () { return list_(); });
+  return run_(function () {
+    var p = (e && e.parameter) || {};
+    if (p.action === 'book') return book_(p.tab);
+    return list_();
+  });
 }
 
 function doPost(e) {
@@ -331,3 +335,58 @@ function tidy_(sh, maxDays) {
     }
   }
 }
+
+// =====================================================================
+// 단어장 탭 (교재마다 탭 하나: Day | 영어 | 뜻 | 단원 이름)
+//  - Day 칸이 숫자가 아니면(예: 부록1) 부록 단원으로 보고, 숫자 Day 뒤에 차례로 붙입니다.
+//  - '단원 이름'은 부록처럼 이름이 있는 단원에만 적으면 됩니다.
+// =====================================================================
+
+function book_(tab) {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(String(tab || ''));
+  if (!sh) throw new Error('단어장 탭을 찾지 못했습니다: ' + tab);
+  var v = sh.getDataRange().getDisplayValues();
+  var head = (v[0] || []).map(function (x) { return norm_(x).toLowerCase(); });
+  var iD = head.indexOf('day'), iE = head.indexOf('영어'), iK = head.indexOf('뜻'), iN = head.indexOf('단원이름');
+  if (iD < 0 || iE < 0 || iK < 0) throw new Error("단어장 탭 첫 줄은 'Day | 영어 | 뜻' 이어야 합니다: " + tab);
+  var units = [], byKey = {};
+  for (var r = 1; r < v.length; r++) {
+    var d = String(v[r][iD] || '').trim(), en = String(v[r][iE] || '').trim(), ko = String(v[r][iK] || '').trim();
+    if (!d || !en) continue;
+    if (!byKey[d]) { byKey[d] = { key: d, name: '', words: [] }; units.push(byKey[d]); }
+    if (iN >= 0 && !byKey[d].name && String(v[r][iN] || '').trim()) byKey[d].name = String(v[r][iN]).trim();
+    byKey[d].words.push([en, ko]);
+  }
+  var maxNum = 0;
+  units.forEach(function (u) { if (/^\d+$/.test(u.key)) maxNum = Math.max(maxNum, Number(u.key)); });
+  var extra = 0, days = [];
+  units.forEach(function (u) {
+    if (/^\d+$/.test(u.key)) days.push({ day: Number(u.key), words: u.words });
+    else { extra++; var o = { day: maxNum + extra, label: u.key, words: u.words }; if (u.name) o.name = u.name; days.push(o); }
+  });
+  days.sort(function (a, b) { return a.day - b.day; });
+  return { ok: true, tab: sh.getName(), days: days };
+}
+
+// 관리: { tab, rows: [[Day, 영어, 뜻, 단원 이름], ...] } — 탭을 새로 만들거나 내용을 통째로 바꿉니다.
+ADMIN_ACTIONS.importBook = function (req) {
+  return withLock_(function () {
+    var tab = String(req.tab || '').trim();
+    if (!/^단어_/.test(tab)) throw new Error("단어장 탭 이름은 '단어_'로 시작해야 합니다.");
+    var rows = req.rows || [];
+    if (!rows.length) throw new Error('올릴 단어가 없습니다.');
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sh = ss.getSheetByName(tab) || ss.insertSheet(tab, ss.getSheets().length);
+    sh.clear();
+    // =, +, -, @ 로 시작하는 글자는 수식으로 읽히지 않게 앞에 ' 를 붙인다 (화면에는 안 보임)
+    var safe = function (x) { x = String(x == null ? '' : x); return /^[=+\-@]/.test(x) ? "'" + x : x; };
+    var data = [['Day', '영어', '뜻', '단원 이름']].concat(rows.map(function (r) { return [safe(r[0]), safe(r[1]), safe(r[2]), safe(r[3] || '')]; }));
+    var rng = sh.getRange(1, 1, data.length, 4);
+    rng.setNumberFormat('@');
+    rng.setValues(data);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, 4).setFontWeight('bold').setBackground('#e8eef9');
+    sh.setColumnWidth(1, 60); sh.setColumnWidth(2, 170); sh.setColumnWidth(3, 420); sh.setColumnWidth(4, 260);
+    return { ok: true, tab: tab, rows: rows.length };
+  });
+};
