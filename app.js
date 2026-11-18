@@ -682,8 +682,6 @@
     selected: new Set(), // 체크한 학생의 행 번호(r)
     bookCache: {},       // 교재 id → 교재 데이터
     qcache: {},          // 학생별 문항 (다시 섞기 전까지 유지)
-    scores: {},          // 입력한 점수 (행 번호 → 점수)
-    totals: {},          // 학생별 만점 (= 문항 수)
     busy: false
   };
   var view = 'gen';
@@ -902,8 +900,6 @@
       .sort(function (a, b) { return gidx(a.g.grade) - gidx(b.g.grade) || a.i - b.i; })
       .map(function (x) { return x.g; });
     var canWrite = prog.version >= 3;
-    var canRecord = prog.version >= 12;
-    $('recordSel').hidden = !canRecord;
     var canAdmin = prog.version >= 4 && !!prog.adminKey;
     $('stuAdd').hidden = !canAdmin;
     var html = '';
@@ -926,12 +922,11 @@
         for (var n = 1; n <= 5; n++) cntOpts += '<option value="' + n + '"' + (n === st.count ? ' selected' : '') + '>' + n + '</option>';
         html += '<tr class="' + (on ? 'on' : '') + '">' +
           '<td class="c-chk"><input type="checkbox" data-r="' + row.r + '"' + (on ? ' checked' : '') + (st.book && st.next ? '' : ' disabled') + '></td>' +
-          '<td class="c-name">' + esc(row.name) + (st.round > 1 ? '<span class="round">' + st.round + '회독</span>' : '') + retestBadge(row, st) + (row.note ? '<span class="note" title="' + esc(row.note) + '">' + esc(row.note) + '</span>' : '') + '</td>' +
+          '<td class="c-name">' + esc(row.name) + (st.round > 1 ? '<span class="round">' + st.round + '회독</span>' : '') + (row.note ? '<span class="note" title="' + esc(row.note) + '">' + esc(row.note) + '</span>' : '') + '</td>' +
           '<td class="c-cnt"><select data-cnt="' + row.r + '" title="이번에 볼 Day 수"' + (st.book ? '' : ' disabled') + '>' + cntOpts + '</select><span class="lbl">개</span></td>' +
           '<td class="c-next"><span class="lbl">다음</span> <b>' + esc(nextTxt) + '</b></td>' +
           '<td class="c-last"><span class="lbl">최근</span> ' + esc(lastTxt) + '</td>' +
           '<td class="c-prog"><span class="bar"><i style="width:' + (st.total ? Math.round(st.done / st.total * 100) : 0) + '%"></i></span> ' + st.done + '/' + st.total + '</td>' +
-          '<td class="c-score">' + (on && canRecord && st.next ? '<input type="number" inputmode="numeric" min="0" class="score" data-score="' + row.r + '" value="' + esc(prog.scores[row.r] == null ? '' : prog.scores[row.r]) + '" placeholder="점수"><span class="lbl" data-total="' + row.r + '">' + (prog.totals[row.r] ? '/' + prog.totals[row.r] : '') + '</span>' : '') + '</td>' +
           '<td class="c-act">' +
             '<button type="button" class="btn small pass" data-pass="' + row.r + '"' + (st.book && st.next && canWrite ? '' : ' disabled') + ' title="' + (st.next ? 'Day ' + esc(st.next.label) + ' 통과로 오늘 날짜 기록' : '') + '">통과 ✓</button>' +
             '<button type="button" class="btn small undo" data-undo="' + row.r + '"' + (st.last && canWrite ? '' : ' disabled') + ' title="마지막 통과 기록 지우기">↶</button>' +
@@ -969,14 +964,6 @@
         var row = prog.data.rows.find(function (x) { return x.r === +sel.getAttribute('data-cnt'); });
         setCount(row, +sel.value);
         renderProgList(); renderBatchSoon();
-      });
-    });
-    qsa('#progTable input[data-score]').forEach(function (inp) {
-      inp.addEventListener('input', function () { prog.scores[+inp.getAttribute('data-score')] = inp.value; });
-      inp.addEventListener('keydown', function (e) {
-        if (e.key !== 'Enter') return;
-        var all = qsa('#progTable input[data-score]'), i = all.indexOf(inp);
-        if (all[i + 1]) all[i + 1].focus(); // Enter로 다음 학생 점수로
       });
     });
     qsa('#progTable [data-pass]').forEach(function (b) {
@@ -1084,35 +1071,6 @@
     window.print();
   }
 
-  // 재시험 표시: 마지막 기록이 '재시험'이고 그 범위가 지금 다음 범위와 같으면
-  function retestBadge(row, st) {
-    var lg = row.log;
-    if (!lg || lg.result !== '재시험' || !st.next || lg.range !== 'Day ' + st.next.label) return '';
-    return '<span class="retest" title="' + esc(lg.date) + '">재시험' + (lg.score !== '' ? ' ' + esc(lg.score) + (lg.total ? '/' + esc(lg.total) : '') : '') + '</span>';
-  }
-  function passRate() { var v = +$('progPass').value; return v > 0 && v <= 100 ? v : 90; }
-
-  // 선택 학생 기록: 점수가 기준 이상(또는 빈칸)이면 통과, 아니면 재시험
-  function recordSelected() {
-    if (prog.busy || !prog.data) return;
-    var rate = passRate(), list = [];
-    prog.data.rows.forEach(function (row) {
-      if (!prog.selected.has(row.r)) return;
-      var st = studentInfo(row);
-      if (!st.book || !st.next) return;
-      var sc = prog.scores[row.r] == null ? '' : String(prog.scores[row.r]).trim();
-      var total = prog.totals[row.r] || 0;
-      var pass = sc === '' || (total ? (+sc / total * 100 >= rate) : true);
-      list.push({ row: row, st: st, score: sc, pass: pass });
-    });
-    if (!list.length) { setStatus('기록할 학생을 체크하세요.', 'err'); return; }
-    var ok = list.filter(function (x) { return x.pass; }), re = list.filter(function (x) { return !x.pass; });
-    var msg = '통과 ' + ok.length + '명' + (ok.length ? ' (' + ok.map(function (x) { return x.row.name; }).join(', ') + ')' : '') +
-      '\n재시험 ' + re.length + '명' + (re.length ? ' (' + re.map(function (x) { return x.row.name + ' ' + x.score; }).join(', ') + ')' : '') +
-      '\n\n통과 기준 ' + rate + '% — 이대로 기록할까요?';
-    if (!confirm(msg)) return;
-    recordRows(list);
-  }
   function recordRows(list) {
     prog.busy = true;
     var done = 0, fail = null;
@@ -1121,21 +1079,19 @@
       return p.then(function () {
         if (fail) return;
         return api('POST', { action: 'record', r: x.row.r, name: x.row.name, units: x.st.next.units, range: x.st.next.label,
-          score: x.score, total: prog.totals[x.row.r] || '', pass: x.pass })
+          score: '', total: '', pass: true })
           .then(function (j) {
             Object.keys(j.values || {}).forEach(function (k) { x.row.cells[k] = j.values[k]; });
             prog.selected.delete(x.row.r);
-            delete prog.scores[x.row.r];
             done++;
             setStatus('기록하는 중… ' + done + '/' + list.length);
           }, function (err) { fail = err; });
       });
     }, Promise.resolve()).then(function () {
       prog.busy = false;
-      var nOk = list.filter(function (x) { return x.pass; }).length;
-      var msg = fail ? ['기록하다 멈췄습니다 (' + done + '/' + list.length + '): ' + fail.message, 'err']
-        : ['기록함: 통과 ' + nOk + '명, 재시험 ' + (list.length - nOk) + '명', 'ok'];
-      // 기록(재시험 표시)까지 다시 불러온 뒤 결과 문구를 보여 줌
+      var msg = fail ? ['기록하다 멈췄습니다: ' + fail.message, 'err']
+        : ['통과 기록함: ' + list.map(function (x) { return x.row.name + ' Day ' + x.st.next.label; }).join(', '), 'ok'];
+      // 시트를 다시 불러온 뒤 결과 문구를 보여 줌
       loadSheet().then(function () { setStatus(msg[0], msg[1]); });
     });
   }
@@ -1187,7 +1143,6 @@
         var nm = ps.type === 'meaning' ? n : ps.type === 'spelling' ? 0 : Math.ceil(n / 2);
         var key = [j.row.r, j.row.name, j.st.book.id, j.st.round, u.label, ps.type, ps.mode].join('|');
         if (force || !prog.qcache[key]) prog.qcache[key] = makeQuestions(pool, nm, n - nm, ps.mode);
-        prog.totals[j.row.r] = prog.qcache[key].length;
         var qs = prog.qcache[key];
         var title = (j.st.book.short || j.st.book.title) + ' Day ' + u.label + (j.st.round > 1 ? ' (' + j.st.round + '회독)' : '');
         var s = { date: ps.date, hint: false, fontSize: 14, columns: 3, mode: ps.mode };
@@ -1202,10 +1157,6 @@
         renderAnswers(qs, s, title, { into: aw, name: j.row.name, heading: heading });
       });
       fitPreview();
-      qsa('#progTable [data-total]').forEach(function (el) {
-        var t = prog.totals[+el.getAttribute('data-total')];
-        el.textContent = t ? '/' + t : '';
-      });
     }).catch(function (err) {
       $('emptyMsg').textContent = bookErrorText(err);
       $('emptyMsg').hidden = false;
@@ -1347,10 +1298,7 @@
     $('adminKeySave').addEventListener('click', saveAdminKey);
     $('adminKey').addEventListener('keydown', function (e) { if (e.key === 'Enter') saveAdminKey(); });
     $('progRefresh').addEventListener('click', loadSheet);
-    $('recordSel').addEventListener('click', recordSelected);
     $('printSheet').addEventListener('click', printSheet);
-    $('progPass').value = lsGet('wordTest.passRate') || '90';
-    $('progPass').addEventListener('change', function () { lsSet('wordTest.passRate', String(passRate())); });
     $('progNone').addEventListener('click', function () { prog.selected.clear(); renderProgList(); renderBatchSoon(); });
     $('progShuffle').addEventListener('click', function () { renderBatchSoon(true); });
     qsa('input[name="progType"], input[name="progMode"], input[name="progAns"]').forEach(function (el) {
