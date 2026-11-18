@@ -326,3 +326,7 @@ body.view-prog .books, body.view-prog #work { display: none !important; }
 .sheet-frame-box { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 .sheet-frame-box iframe { display: block; width: 100%; height: calc(100vh - 170px); min-height: 480px; border: 0; background: #fff; }
 .sheet-frame-box .empty { border: 0; border-radius: 0; }
+
+/* 진도표 '시트' 화면: 오른쪽 미리보기 숨기고 시트를 넓게 */
+body.view-prog.pmode-sheet .preview { display: none; }
+body.view-prog.pmode-sheet .layout { grid-template-columns: minmax(0, 1fr); }

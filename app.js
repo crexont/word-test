@@ -1089,6 +1089,8 @@
     $('sheetOpen').hidden = !src;
     if (src) $('sheetOpen').href = src;
     $('progGrid').hidden = pmode === 'sheet';
+    document.body.classList.toggle('pmode-sheet', pmode === 'sheet'); // 시트 화면에서는 미리보기 숨기고 넓게
+    setTimeout(fitPreview, 50);
     $('sheetFrameBox').hidden = pmode !== 'sheet';
     $('pmodeNote').textContent = pmode === 'sheet' ? '시트에서 고친 내용은 "목록"으로 돌아오면 반영됩니다. 화면이 안 보이면 "새 창에서 열기"를 쓰세요.' : '';
     if (pmode === 'sheet') {
