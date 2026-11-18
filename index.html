@@ -8,7 +8,7 @@
   // 저장된 화면 모드를 먼저 적용해 깜빡임 방지
   try { var t = localStorage.getItem('wordTest.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
 </script>
-<link rel="stylesheet" href="style.css?v=20261118y">
+<link rel="stylesheet" href="style.css?v=20261118z">
 </head>
 <body>
 <div class="layout">
@@ -45,7 +45,7 @@
           </label>
         </div>
         <div class="field-row when-disconnected">
-          <label class="field grow">구글 시트 주소 ("시트" 화면에 띄울 진도표, 없으면 비워 두세요)
+          <label class="field grow">구글 시트 주소 ("시트" 화면에 띄울 진도표, 비우면 학원 진도표)
             <input type="url" id="sheetDocUrl" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off" spellcheck="false">
           </label>
         </div>
@@ -234,6 +234,6 @@
   <option value="중1"><option value="중2"><option value="중3"><option value="고1"><option value="고2"><option value="고3">
 </datalist>
 
-<script src="app.js?v=20261118y"></script>
+<script src="app.js?v=20261118z"></script>
 </body>
 </html>

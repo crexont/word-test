@@ -818,8 +818,8 @@
     lsSet(SHEET_KEY, url);
     prog.adminKey = $('adminKey').value.trim();
     lsSet('wordTest.adminKey', prog.adminKey);
-    prog.docUrl = $('sheetDocUrl').value.trim();
-    lsSet('wordTest.sheetDoc', prog.docUrl);
+    prog.docUrl = $('sheetDocUrl').value.trim() || DEFAULT_SHEET_DOC;
+    lsSet('wordTest.sheetDoc', prog.docUrl === DEFAULT_SHEET_DOC ? '' : prog.docUrl);
     $('sheetFrame').removeAttribute('src');
     loadSheet();
     if (pmode === 'sheet') setPMode('sheet');
@@ -1073,6 +1073,8 @@
 
   // ---------- 진도표: 목록 / 시트(구글 시트 화면 그대로) ----------
   var pmode = 'list';
+  // 학원 진도표 시트 (주소 변경에서 다른 시트를 넣으면 그쪽을 씀)
+  var DEFAULT_SHEET_DOC = 'https://docs.google.com/spreadsheets/d/16lVrtnWMEm_ZWxBh4jsvx45KuEK4KlYu9Mim2xLMEPg/edit?usp=sharing';
   // 구글 시트 주소 → 화면 안에 넣을 편집 주소 (탭 위치 #gid는 유지)
   function sheetEmbedUrl(u) {
     var m = /\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/.exec(u || '');
@@ -1224,7 +1226,7 @@
     prog.grade = lsGet('wordTest.grade');
     prog.adminKey = lsGet('wordTest.adminKey');
     $('adminKey').value = prog.adminKey;
-    prog.docUrl = lsGet('wordTest.sheetDoc');
+    prog.docUrl = lsGet('wordTest.sheetDoc') || DEFAULT_SHEET_DOC;
     $('sheetDocUrl').value = prog.docUrl;
     qsa('input[name="pmode"]').forEach(function (r) { r.addEventListener('change', function () { setPMode(r.value); }); });
     setPMode(lsGet('wordTest.pmode') || 'list');
