@@ -384,3 +384,34 @@ body.view-prog.pmode-sheet .layout { grid-template-columns: minmax(0, 1fr); }
   .sp-table td sup { font-size: 5pt; }
   .sp-table .b5 { border-right: 1pt solid #555; }
 }
+
+/* ===== 태블릿·휴대폰 ===== */
+@media (max-width: 960px) {
+  .ptable .c-cnt { white-space: nowrap; }
+}
+@media (max-width: 640px) {
+  .top { flex-wrap: wrap; padding: 10px 14px 4px; gap: 8px; }
+  .top h1 { font-size: 17px; flex-basis: 100%; }
+  .tabs { margin-left: 0; }
+  .tabs button { white-space: nowrap; }
+  .books { padding-left: 14px; padding-right: 14px; }
+  .work { padding: 0 14px 14px; }
+  .prog { padding: 8px 14px 12px; }
+  .block-head { flex-wrap: wrap; }
+  .block-head h2 { white-space: nowrap; }
+  .head-btns { display: flex; flex-wrap: wrap; gap: 4px; }
+  .sheet-status .admin-key input { width: 150px; }
+  /* 학생 줄: 표 대신 두 줄 카드 */
+  .ptable, .ptable tbody { display: block; table-layout: auto; }
+  .ptable tr { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto auto; grid-template-areas: "chk name cnt next" "chk last score act"; align-items: center; column-gap: 6px; border-bottom: 1px solid var(--line); padding: 4px 0; }
+  .ptable td { border-bottom: 0; padding: 2px 0; width: auto !important; white-space: nowrap; }
+  .ptable tr.on { background: var(--accent-soft); }
+  .ptable .c-chk { grid-area: chk; }
+  .ptable .c-name { grid-area: name; }
+  .ptable .c-cnt { grid-area: cnt; }
+  .ptable .c-next { grid-area: next; text-align: right; }
+  .ptable .c-last { grid-area: last; font-size: 12px; color: var(--muted); }
+  .ptable .c-score { grid-area: score; }
+  .ptable .c-act { grid-area: act; text-align: right; }
+  .ptable .c-score:empty { display: none; }
+}
