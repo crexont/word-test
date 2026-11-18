@@ -17,7 +17,7 @@
 var SHEET_NAME = '';
 
 // 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭, 6: 관리 기능 안정화, 7: 서식 유지, 8: 교재 색을 사이트에서 지정, 9: 시트 보기 좋게)
-var VERSION = 10;
+var VERSION = 11;
 
 // 진도표 '교재' 칸 색 (교재 약칭 기준, 띄어쓰기 무시). 여기 없는 교재는 원래 칠해 둔 색을 유지합니다.
 var BOOK_COLORS = {
@@ -332,8 +332,12 @@ function styleSheet_(sh, T) {
     var top = sh.getRange(1, 1, 2, W);
     var title = String(sh.getRange(1, 1).getDisplayValue() || '').trim() || 'VOCA 진도표';
     top.breakApart().clearContent();
+    // 넘친 글자는 고정선·옆 칸에서 잘리므로, 칸을 합쳐 자리를 만든다 (고정선을 넘지 않게 양쪽 따로)
+    sh.getRange(1, 1, 1, L.iName + 1).merge();
     sh.getRange(1, 1).setValue(title).setFontSize(13).setFontWeight('bold').setHorizontalAlignment('left').setVerticalAlignment('middle');
     if (L.units.length) {
+      var span = Math.min(14, W - L.units[0].col);
+      sh.getRange(1, L.units[0].col + 1, 1, span).merge();
       sh.getRange(1, L.units[0].col + 1).setValue('초록 = 통과 · 진초록 = 2회독 이상 · 회색 = 교재 범위 밖')
         .setFontSize(9).setFontColor('#666666').setFontWeight('normal').setHorizontalAlignment('left').setVerticalAlignment('middle');
     }
