@@ -16,8 +16,8 @@
 // 진도표가 있는 시트(탭) 이름. 비워 두면 첫 번째 시트를 씁니다.
 var SHEET_NAME = '';
 
-// 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭, 6: 관리 기능 안정화, 7: 서식 유지, 8: 교재 색을 사이트에서 지정)
-var VERSION = 8;
+// 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭, 6: 관리 기능 안정화, 7: 서식 유지, 8: 교재 색을 사이트에서 지정, 9: 시트 보기 좋게)
+var VERSION = 9;
 
 // 진도표 '교재' 칸 색 (교재 약칭 기준, 띄어쓰기 무시). 여기 없는 교재는 원래 칠해 둔 색을 유지합니다.
 var BOOK_COLORS = {
@@ -271,7 +271,7 @@ function writeTable_(sh, T, maxDays) {
       .setBorder(false, false, false, false, false, false)
       .setBackground(null).setFontWeight('normal').setFontColor(null);
   }
-  if (!n) return;
+  if (!n) { styleSheet_(sh, T); return; }
   var table = sh.getRange(T.first, 1, n, W);
   table.setValues(T.rows.map(function (x) { return x.v; }));
   // 학생 수와 상관없이 같은 모양: 테두리, 이름 굵게·가운데, Day 칸 가운데·작은 글씨
@@ -318,6 +318,70 @@ function writeTable_(sh, T, maxDays) {
       return line;
     });
     sh.getRange(T.first, c0b + 1, n, c1 - c0b + 1).setBackgrounds(bg);
+  }
+  styleSheet_(sh, T);
+}
+
+// 보기 좋게 (화면·인쇄): 제목·머리글, 고정, 너비·높이, 묶음 구분선, 5일 구분선, 통과 칸 색
+function styleSheet_(sh, T) {
+  var L = T.L, W = T.W, n = T.rows.length, first = T.first, head = first - 1; // head: 마지막 머리글 줄(1-base)
+  var BS = SpreadsheetApp.BorderStyle;
+
+  // 제목·안내 (머리글 위 두 줄). 학년·교재·이름 열을 고정하려면 제목이 그 경계를 넘는 병합이면 안 되므로 병합을 풀고 왼쪽에 둔다
+  if (head >= 3) {
+    var top = sh.getRange(1, 1, 2, W);
+    var title = String(sh.getRange(1, 1).getDisplayValue() || '').trim() || 'VOCA 진도표';
+    top.breakApart().clearContent();
+    sh.getRange(1, 1).setValue(title).setFontSize(15).setFontWeight('bold').setHorizontalAlignment('left').setVerticalAlignment('middle');
+    if (L.units.length) {
+      sh.getRange(1, L.units[0].col + 1).setValue('초록 = 통과 · 진초록 = 2회독 이상 · 회색 = 교재 범위 밖 · Day 칸에 통과 날짜 (사이트에서 통과 ✓ 누르면 자동 기록)')
+        .setFontSize(9).setFontColor('#666666').setFontWeight('normal').setHorizontalAlignment('left').setVerticalAlignment('middle');
+    }
+    sh.setRowHeight(1, 34);
+    sh.setRowHeight(2, 6);
+  }
+
+  // 머리글
+  sh.getRange(head, 1, 1, W).setBackground('#1f3864').setFontColor('#ffffff').setFontWeight('bold')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle').setFontSize(10);
+  sh.setRowHeight(head, 26);
+
+  // 고정: 머리글 줄까지, 학년·교재·이름 열까지
+  sh.setFrozenRows(head);
+  sh.setFrozenColumns(L.iName + 1);
+
+  // 너비
+  if (L.iGrade >= 0) sh.setColumnWidth(L.iGrade + 1, 46);
+  if (L.iBook >= 0) sh.setColumnWidth(L.iBook + 1, 92);
+  sh.setColumnWidth(L.iName + 1, 70);
+  if (L.units.length) sh.setColumnWidths(L.units[0].col + 1, L.units.length, 40);
+  if (L.iNote >= 0) sh.setColumnWidth(L.iNote + 1, 150);
+  if (!n) return;
+
+  // 줄 높이, 이름 글씨
+  sh.setRowHeights(first, n, 22);
+  sh.getRange(first, L.iName + 1, n, 1).setFontSize(11);
+
+  // 교재 묶음이 바뀌는 곳에 진한 가로선
+  for (var k = 0; k < n; k++) {
+    var last = k === n - 1 || T.rows[k + 1].grade !== T.rows[k].grade || T.rows[k + 1].book !== T.rows[k].book;
+    if (last) sh.getRange(first + k, 1, 1, W).setBorder(null, null, true, null, null, null, '#595959', BS.SOLID_MEDIUM);
+  }
+  // 이름 열 오른쪽, Day 5·10·15 … 오른쪽에 진한 세로선 (머리글 포함)
+  sh.getRange(head, L.iName + 1, n + 1, 1).setBorder(null, null, null, true, null, null, '#595959', BS.SOLID_MEDIUM);
+  L.units.forEach(function (u) {
+    var b = Number(String(u.label).split('-').pop());
+    if (b % 5 === 0) sh.getRange(head, u.col + 1, n + 1, 1).setBorder(null, null, null, true, null, null, '#8c8c8c', BS.SOLID_MEDIUM);
+  });
+
+  // 통과한 칸 색 (조건부 서식이라 시트에 직접 적어도 자동으로 칠해짐)
+  if (L.units.length) {
+    var block = sh.getRange(first, L.units[0].col + 1, n, L.units[L.units.length - 1].col - L.units[0].col + 1);
+    var rules = [
+      SpreadsheetApp.newConditionalFormatRule().whenTextContains(',').setBackground('#93c47d').setRanges([block]).build(),
+      SpreadsheetApp.newConditionalFormatRule().whenCellNotEmpty().setBackground('#d9ead3').setRanges([block]).build()
+    ];
+    sh.setConditionalFormatRules(rules);
   }
 }
 
