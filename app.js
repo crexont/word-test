@@ -625,9 +625,35 @@
   }
 
   // ---------- 인쇄 ----------
+  // 양면 인쇄: 학생마다 새 장(앞면)에서 시작하도록, 쪽 수가 홀수인 학생 뒤에 빈 쪽을 하나 넣는다
+  //  - 시험지만: 학생별 시험지 / 시험지+답지(학생마다): 학생별 시험지+답지 / 답지 맨 뒤: 시험지만 맞춤
+  //  - 답지만 인쇄할 때는 넣지 않음 (선생님용)
+  function addDuplexPads(kind) {
+    qsa('.page.pad-page').forEach(function (p) { p.remove(); });
+    if (view !== 'prog' || !$('progDuplex').checked || kind === 'answer') return;
+    var ansEach = (radioValue('progAns') || 'each') === 'each';
+    var groups = {};
+    qsa('#scaler .student-set').forEach(function (w) {
+      var k = w.getAttribute('data-kind');
+      if (k === 'answer' && !(kind === 'both' && ansEach)) return;
+      var key = w.getAttribute('data-student');
+      (groups[key] = groups[key] || []).push(w);
+    });
+    Object.keys(groups).forEach(function (key) {
+      var pages = [];
+      groups[key].forEach(function (w) { pages = pages.concat(Array.prototype.slice.call(w.querySelectorAll('.page'))); });
+      if (pages.length % 2 === 0) return;
+      var last = pages[pages.length - 1];
+      var pad = document.createElement('div');
+      pad.className = 'page pad-page ' + (last.classList.contains('answer') ? 'answer' : 'test');
+      last.parentNode.insertBefore(pad, last.nextSibling);
+    });
+  }
+
   function doPrint(kind) {
     document.body.classList.remove('print-test', 'print-answer', 'print-both');
     document.body.classList.add('print-' + kind);
+    addDuplexPads(kind);
     // 인쇄될 마지막 페이지 뒤에는 빈 페이지가 생기지 않도록 표시
     qsa('.page.last-printed').forEach(function (p) { p.classList.remove('last-printed'); });
     var pages = qsa('#scaler .page').filter(function (p) {
@@ -1026,9 +1052,11 @@
         var s = { date: ps.date, hint: false, fontSize: 14, columns: 3, mode: ps.mode };
         var heading = function (d) { return 'Day ' + d; };
         var tw = document.createElement('div'); tw.className = 'student-set';
+        tw.setAttribute('data-student', i); tw.setAttribute('data-kind', 'test');
         testBox.appendChild(tw);
         renderTestFit(qs, s, title, { into: tw, name: j.row.name, heading: heading });
         var aw = document.createElement('div'); aw.className = 'student-set';
+        aw.setAttribute('data-student', i); aw.setAttribute('data-kind', 'answer');
         (ps.ans === 'each' ? testBox : ansBox).appendChild(aw);
         renderAnswers(qs, s, title, { into: aw, name: j.row.name, heading: heading });
       });
@@ -1140,6 +1168,8 @@
     });
     $('progDate').addEventListener('change', function () { renderBatchSoon(); });
     $('progDate').value = todayStr();
+    $('progDuplex').checked = lsGet('wordTest.duplex') !== 'off';
+    $('progDuplex').addEventListener('change', function () { lsSet('wordTest.duplex', $('progDuplex').checked ? 'on' : 'off'); });
     var dflt = lsGet('wordTest.dayDefault');
     if (dflt) $('progDefault').value = dflt;
     $('progDefault').addEventListener('change', function () {
@@ -1158,6 +1188,7 @@
   }
   window.addEventListener('afterprint', function () {
     document.body.classList.remove('print-test', 'print-answer', 'print-both');
+    qsa('.page.pad-page').forEach(function (p) { p.remove(); });
   });
 
   // ---------- 초기화 ----------

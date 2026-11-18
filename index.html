@@ -8,7 +8,7 @@
   // 저장된 화면 모드를 먼저 적용해 깜빡임 방지
   try { var t = localStorage.getItem('wordTest.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
 </script>
-<link rel="stylesheet" href="style.css?v=20261118u">
+<link rel="stylesheet" href="style.css?v=20261118v">
 </head>
 <body>
 <div class="layout">
@@ -81,6 +81,7 @@
             </div>
           </div>
           <label class="field">날짜<input type="date" id="progDate"></label>
+          <label class="switch duplex"><input type="checkbox" id="progDuplex" checked><span class="knob"></span><span>양면 인쇄 <small class="tiny">학생마다 새 장에서 시작</small></span></label>
         </div>
 
         <div class="block prog-list">
@@ -214,6 +215,6 @@
   <option value="중1"><option value="중2"><option value="중3"><option value="고1"><option value="고2"><option value="고3">
 </datalist>
 
-<script src="app.js?v=20261118u"></script>
+<script src="app.js?v=20261118v"></script>
 </body>
 </html>

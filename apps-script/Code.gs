@@ -16,8 +16,8 @@
 // 진도표가 있는 시트(탭) 이름. 비워 두면 첫 번째 시트를 씁니다.
 var SHEET_NAME = '';
 
-// 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭)
-var VERSION = 5;
+// 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭, 6: 관리 기능 안정화)
+var VERSION = 6;
 
 var UNIT_RE = /^\d+\s*[-~]\s*\d+$|^\d+$/;
 
@@ -135,6 +135,9 @@ function set_(req) {
 
 // =====================================================================
 // 관리 기능 (관리 키가 맞을 때만)
+//  방식: 학생 표를 읽어 목록으로 만든 뒤 → 목록에서 추가·수정·삭제 → 데이터 영역의 병합을 모두 풀고
+//        표 전체를 다시 쓴 다음 같은 학년·교재끼리 다시 병합한다.
+//        (줄 끼워 넣기 + 일부 병합 풀기는 구글 시트에서 "병합된 셀의 일부" 오류가 나므로 쓰지 않음)
 // =====================================================================
 
 // 처음 한 번 실행: 관리 키를 만들어 스크립트 속성에 저장하고 실행 로그에 보여 줍니다.
@@ -152,189 +155,174 @@ function checkKey_(key) {
   if (String(key || '') !== saved) throw new Error('관리 키가 맞지 않습니다.');
 }
 
-var ADMIN_ACTIONS = {
-  // { grade, book, name, note, cells?: {'1':'11/18', ...}, maxDays?: {'수능2000': 50, ...} }
-  addStudent: function (req) { return withLock_(function () { return addStudent_(req); }); },
-  // { r, name(확인용), set: {grade?, book?, name?, note?}, maxDays? }
-  updateStudent: function (req) {
-    return withLock_(function () {
-      var sh = sheet_(), cur = readRows_(sh);
-      var row = findRow_(cur, req);
-      var s = req.set || {};
-      var g = s.grade != null ? String(s.grade).trim() : row.grade;
-      var b = s.book != null ? String(s.book).trim() : row.book;
-      if (g === row.grade && b === row.book) {
-        // 같은 묶음 안: 그 줄의 이름·비고만 고친다
-        if (s.name != null) sh.getRange(row.r, cur.L.iName + 1).setValue(String(s.name).trim());
-        if (s.note != null && cur.L.iNote >= 0) sh.getRange(row.r, cur.L.iNote + 1).setValue(String(s.note));
-        tidy_(sh, req.maxDays);
-        return { ok: true };
-      }
-      // 다른 학년·교재로: 진도 날짜를 가지고 그 묶음으로 옮긴다
-      deleteRowSafe_(sh, row.r);
-      return addStudent_({ grade: g, book: b, name: s.name != null ? s.name : row.name, note: s.note != null ? s.note : row.note, cells: row.cells, maxDays: req.maxDays });
-    });
-  },
-  // { r, name(확인용) }
-  deleteStudent: function (req) {
-    return withLock_(function () {
-      var sh = sheet_(), cur = readRows_(sh);
-      var row = findRow_(cur, req);
-      deleteRowSafe_(sh, row.r);
-      tidy_(sh, req.maxDays);
-      return { ok: true };
-    });
-  },
-  // { r, name(확인용), unit, value } — 날짜 칸을 원하는 값으로 (빈 값이면 지움)
-  setCell: function (req) {
-    return withLock_(function () {
-      var sh = sheet_(), cur = readRows_(sh);
-      var row = findRow_(cur, req);
-      var u = cur.L.units.filter(function (x) { return x.label === norm_(req.unit); })[0];
-      if (!u) throw new Error('Day 칸을 찾지 못했습니다: ' + req.unit);
-      var cell = sh.getRange(row.r, u.col + 1);
-      if (String(req.value || '').trim()) cell.setNumberFormat('@').setValue(String(req.value).trim()); else cell.clearContent();
-      return { ok: true };
-    });
-  },
-  // { maxDays? } — 병합·회색 칸 다시 정리
-  tidy: function (req) { return withLock_(function () { tidy_(sheet_(), req.maxDays); return { ok: true }; }); }
-};
-
 function withLock_(fn) {
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try { return fn(); } finally { lock.releaseLock(); }
 }
 
-// 병합된 학년·교재 칸의 첫 줄을 지워도 값이 사라지지 않게, 지우기 전에 병합을 풀고 값을 채워 둔다
-function deleteRowSafe_(sh, r) {
-  var cur = readRows_(sh), L = cur.L, rows = cur.rows;
-  var first = L.firstDataRow + 1, last = rows.length ? rows[rows.length - 1].r : first;
-  [L.iGrade, L.iBook].forEach(function (col) {
-    if (col < 0) return;
-    var rng = sh.getRange(first, col + 1, last - first + 1, 1);
-    rng.breakApart();
-    var vals = [], keep = '';
-    for (var i = first; i <= last; i++) {
-      var v = String((cur.values[i - 1] || [])[col] || '').trim();
-      if (v) keep = v;
-      vals.push([keep]);
-    }
-    rng.setValues(vals);
-  });
-  sh.deleteRow(r);
-}
-
-// 학년·교재를 위에서 이어 받아 줄 목록으로
-function readRows_(sh) {
-  var values = sh.getDataRange().getDisplayValues();
-  var L = layout_(values);
-  var out = [], grade = '', book = '';
-  for (var i = L.firstDataRow; i < values.length; i++) {
-    var v = values[i];
-    if (L.iGrade >= 0 && String(v[L.iGrade]).trim()) grade = String(v[L.iGrade]).trim();
-    if (L.iBook >= 0 && String(v[L.iBook]).trim()) book = String(v[L.iBook]).trim();
-    var name = String(v[L.iName] || '').trim();
-    if (!name) continue;
-    var cells = {};
-    L.units.forEach(function (u) { cells[u.label] = String(v[u.col] || '').trim(); });
-    out.push({ r: i + 1, grade: grade, book: book, name: name, note: L.iNote >= 0 ? String(v[L.iNote] || '') : '', cells: cells });
-  }
-  return { L: L, values: values, rows: out };
-}
-
-function findRow_(cur, req) {
-  var row = cur.rows.filter(function (x) { return x.r === Number(req.r); })[0];
-  if (!row || row.name !== String(req.name || '').trim()) throw new Error('시트가 바뀌었습니다. 새로고침한 뒤 다시 시도하세요.');
-  return row;
-}
-
 var GRADE_ORDER_ = ['초4', '초5', '초6', '중1', '중2', '중3', '고1', '고2', '고3'];
 function gradeIdx_(g) { var i = GRADE_ORDER_.indexOf(g); return i < 0 ? 99 : i; }
 
-function addStudent_(req) {
-  var sh = sheet_(), cur = readRows_(sh), L = cur.L;
-  var grade = String(req.grade || '').trim(), book = String(req.book || '').trim(), name = String(req.name || '').trim();
-  if (!name) throw new Error('이름이 비어 있습니다.');
-  if (!book) throw new Error('교재가 비어 있습니다.');
-  if (L.iGrade < 0 && grade) throw new Error("시트에 '학년' 칸이 없습니다.");
-  var rows = cur.rows, at;
-  // 1) 같은 학년·교재 묶음의 맨 아래 2) 같은 학년의 맨 아래 3) 학년 순서상 들어갈 자리 4) 맨 끝
-  var same = rows.filter(function (x) { return x.grade === grade && x.book === book; });
-  var sameGrade = rows.filter(function (x) { return x.grade === grade; });
-  if (same.length) at = { after: same[same.length - 1].r };
-  else if (sameGrade.length) at = { after: sameGrade[sameGrade.length - 1].r };
-  else {
-    var later = rows.filter(function (x) { return gradeIdx_(x.grade) > gradeIdx_(grade); })[0];
-    at = later ? { before: later.r } : { after: rows.length ? rows[rows.length - 1].r : L.firstDataRow };
-  }
-  var r;
-  if (at.after) { sh.insertRowAfter(at.after); r = at.after + 1; } else { sh.insertRowBefore(at.before); r = at.before; }
+// 학생 표 읽기: 학년·교재는 병합 위 칸에서 이어 받고, 이름 없는 줄은 버린다
+function table_(sh) {
+  var values = sh.getDataRange().getDisplayValues();
+  var L = layout_(values);
   var W = sh.getLastColumn();
-  var line = [];
-  for (var c = 0; c < W; c++) line.push('');
-  if (L.iGrade >= 0) line[L.iGrade] = grade;
-  if (L.iBook >= 0) line[L.iBook] = book;
-  line[L.iName] = name;
-  if (L.iNote >= 0) line[L.iNote] = String(req.note || '');
-  var cells = req.cells || {};
-  L.units.forEach(function (u) { line[u.col] = cells[u.label] || ''; });
-  var rng = sh.getRange(r, 1, 1, W);
-  rng.breakApart();
-  rng.setValues([line]);
-  tidy_(sh, req.maxDays);
-  return { ok: true, r: r };
+  var rows = [], g = '', b = '';
+  for (var i = L.firstDataRow; i < values.length; i++) {
+    var v = values[i].slice();
+    while (v.length < W) v.push('');
+    if (L.iGrade >= 0 && String(v[L.iGrade]).trim()) g = String(v[L.iGrade]).trim();
+    if (L.iBook >= 0 && String(v[L.iBook]).trim()) b = String(v[L.iBook]).trim();
+    var name = String(v[L.iName] || '').trim();
+    if (!name) continue;
+    if (L.iGrade >= 0) v[L.iGrade] = g;
+    if (L.iBook >= 0) v[L.iBook] = b;
+    v[L.iName] = name;
+    rows.push({ r: i + 1, grade: L.iGrade >= 0 ? g : '', book: b, name: name, v: v });
+  }
+  return { L: L, first: L.firstDataRow + 1, W: W, rows: rows };
 }
 
-// 학년·교재 칸을 같은 값끼리 다시 병합하고, Day 칸은 텍스트 형식 + 교재 범위 밖은 회색으로
-function tidy_(sh, maxDays) {
-  var cur = readRows_(sh), L = cur.L, rows = cur.rows;
-  if (!rows.length) return;
-  var first = L.firstDataRow + 1, last = rows[rows.length - 1].r, n = last - first + 1;
-  var grades = [], books = [], g = '', b = '';
-  for (var i = first; i <= last; i++) {
-    var v = cur.values[i - 1] || [];
-    if (L.iGrade >= 0 && String(v[L.iGrade] || '').trim()) g = String(v[L.iGrade]).trim();
-    if (L.iBook >= 0 && String(v[L.iBook] || '').trim()) b = String(v[L.iBook]).trim();
-    grades.push(g); books.push(b);
+function findIdx_(T, req) {
+  for (var i = 0; i < T.rows.length; i++) {
+    if (T.rows[i].r === Number(req.r) && T.rows[i].name === String(req.name || '').trim()) return i;
   }
-  function mergeRuns(col, keyAt, shown) {
-    var rng = sh.getRange(first, col + 1, n, 1);
-    rng.breakApart();
-    rng.setValues(shown.map(function (x) { return [x]; }));
+  throw new Error('시트가 바뀌었습니다. 새로고침한 뒤 다시 시도하세요.');
+}
+
+// 새 학생이 들어갈 자리: 같은 학년·교재 묶음 끝 → 같은 학년 끝 → 학년 순서상 자리 → 맨 끝
+function placeIdx_(rows, grade, book) {
+  var i, lastSame = -1, lastGrade = -1;
+  for (i = 0; i < rows.length; i++) {
+    if (rows[i].grade === grade && rows[i].book === book) lastSame = i;
+    if (rows[i].grade === grade) lastGrade = i;
+  }
+  if (lastSame >= 0) return lastSame + 1;
+  if (lastGrade >= 0) return lastGrade + 1;
+  for (i = 0; i < rows.length; i++) if (gradeIdx_(rows[i].grade) > gradeIdx_(grade)) return i;
+  return rows.length;
+}
+
+function setRow_(T, row, grade, book) {
+  var L = T.L;
+  row.grade = L.iGrade >= 0 ? grade : '';
+  row.book = book;
+  if (L.iGrade >= 0) row.v[L.iGrade] = row.grade;
+  if (L.iBook >= 0) row.v[L.iBook] = book;
+}
+
+// 표 전체 다시 쓰기 + 병합 + Day 칸 텍스트 형식 + 교재 범위 밖 회색
+function writeTable_(sh, T, maxDays) {
+  var L = T.L, n = T.rows.length, W = T.W;
+  var span = Math.max(sh.getMaxRows() - T.first + 1, n);
+  if (sh.getMaxRows() < T.first + n - 1) sh.insertRowsAfter(sh.getMaxRows(), T.first + n - 1 - sh.getMaxRows());
+  // 머리글 아래 데이터 영역 전체를 한 번에 정리 (병합을 모두 포함하므로 "일부 병합" 오류가 나지 않음)
+  var area = sh.getRange(T.first, 1, span, W);
+  area.breakApart();
+  area.clearContent();
+  if (L.units.length) {
+    var c0 = L.units[0].col, nc = L.units[L.units.length - 1].col - c0 + 1;
+    sh.getRange(T.first, c0 + 1, span, nc).setBackground(null).setNumberFormat('@');
+  }
+  if (!n) return;
+  sh.getRange(T.first, 1, n, W).setValues(T.rows.map(function (x) { return x.v; }));
+
+  function mergeRuns(col, keyAt) {
     var s = 0;
     for (var k = 1; k <= n; k++) {
       if (k === n || keyAt(k) !== keyAt(s)) {
-        if (k - s > 1 && shown[s]) sh.getRange(first + s, col + 1, k - s, 1).merge();
+        if (k - s > 1 && String(T.rows[s].v[col]).trim()) sh.getRange(T.first + s, col + 1, k - s, 1).merge();
         s = k;
       }
     }
-    rng.setVerticalAlignment('middle').setHorizontalAlignment('center');
+    sh.getRange(T.first, col + 1, n, 1).setVerticalAlignment('middle').setHorizontalAlignment('center');
   }
-  if (L.iGrade >= 0) mergeRuns(L.iGrade, function (k) { return grades[k]; }, grades);
-  if (L.iBook >= 0) mergeRuns(L.iBook, function (k) { return grades[k] + '|' + books[k]; }, books);
+  if (L.iGrade >= 0) mergeRuns(L.iGrade, function (k) { return T.rows[k].grade; });
+  if (L.iBook >= 0) mergeRuns(L.iBook, function (k) { return T.rows[k].grade + '|' + T.rows[k].book; });
 
-  if (L.units.length) {
-    var c0 = L.units[0].col, c1 = L.units[L.units.length - 1].col;
-    var block = sh.getRange(first, c0 + 1, n, c1 - c0 + 1);
-    block.setNumberFormat('@');
-    if (maxDays) {
-      var key = function (s) { return String(s || '').replace(/\(.*?\)/g, '').replace(/\s+/g, '').toLowerCase(); };
-      var mk = {};
-      Object.keys(maxDays).forEach(function (k) { mk[key(k)] = Number(maxDays[k]); });
-      var unitAt = {};
-      L.units.forEach(function (u) { unitAt[u.col] = Number(String(u.label).split('-')[0]); });
-      var bg = [];
-      for (var x = 0; x < n; x++) {
-        var max = mk[key(books[x])] || 0, line = [];
-        for (var c = c0; c <= c1; c++) line.push(max && unitAt[c] > max ? '#d9d9d9' : null);
-        bg.push(line);
-      }
-      block.setBackgrounds(bg);
-    }
+  if (maxDays && L.units.length) {
+    var key = function (s) { return String(s || '').replace(/\(.*?\)/g, '').replace(/\s+/g, '').toLowerCase(); };
+    var mk = {};
+    Object.keys(maxDays).forEach(function (k) { mk[key(k)] = Number(maxDays[k]); });
+    var c0b = L.units[0].col, c1 = L.units[L.units.length - 1].col;
+    var unitAt = {};
+    L.units.forEach(function (u) { unitAt[u.col] = Number(String(u.label).split('-')[0]); });
+    var bg = T.rows.map(function (row) {
+      var max = mk[key(row.book)] || 0, line = [];
+      for (var c = c0b; c <= c1; c++) line.push(max && unitAt[c] > max ? '#d9d9d9' : null);
+      return line;
+    });
+    sh.getRange(T.first, c0b + 1, n, c1 - c0b + 1).setBackgrounds(bg);
   }
 }
+
+var ADMIN_ACTIONS = {
+  // { grade, book, name, note }
+  addStudent: function (req) {
+    return withLock_(function () {
+      var sh = sheet_(), T = table_(sh), L = T.L;
+      var grade = String(req.grade || '').trim(), book = String(req.book || '').trim(), name = String(req.name || '').trim();
+      if (!name) throw new Error('이름이 비어 있습니다.');
+      if (!book) throw new Error('교재가 비어 있습니다.');
+      if (L.iGrade < 0 && grade) throw new Error("시트에 '학년' 칸이 없습니다.");
+      var v = [];
+      for (var c = 0; c < T.W; c++) v.push('');
+      v[L.iName] = name;
+      if (L.iNote >= 0) v[L.iNote] = String(req.note || '');
+      var row = { name: name, v: v };
+      setRow_(T, row, grade, book);
+      T.rows.splice(placeIdx_(T.rows, row.grade, book), 0, row);
+      writeTable_(sh, T, req.maxDays);
+      return { ok: true };
+    });
+  },
+  // { r, name(확인용), set: {grade?, book?, name?, note?} }
+  updateStudent: function (req) {
+    return withLock_(function () {
+      var sh = sheet_(), T = table_(sh), L = T.L;
+      var i = findIdx_(T, req), row = T.rows[i], s = req.set || {};
+      if (s.name != null && String(s.name).trim()) { row.name = String(s.name).trim(); row.v[L.iName] = row.name; }
+      if (s.note != null && L.iNote >= 0) row.v[L.iNote] = String(s.note);
+      var g = s.grade != null ? String(s.grade).trim() : row.grade;
+      var b = s.book != null && String(s.book).trim() ? String(s.book).trim() : row.book;
+      if (g !== row.grade || b !== row.book) {
+        // 다른 학년·교재로: 통과 기록(같은 줄의 Day 칸)을 그대로 가지고 그 묶음으로 옮긴다
+        T.rows.splice(i, 1);
+        setRow_(T, row, g, b);
+        T.rows.splice(placeIdx_(T.rows, row.grade, b), 0, row);
+      }
+      writeTable_(sh, T, req.maxDays);
+      return { ok: true };
+    });
+  },
+  // { r, name(확인용) }
+  deleteStudent: function (req) {
+    return withLock_(function () {
+      var sh = sheet_(), T = table_(sh);
+      T.rows.splice(findIdx_(T, req), 1);
+      writeTable_(sh, T, req.maxDays);
+      return { ok: true };
+    });
+  },
+  // { r, name(확인용), unit, value } — 날짜 칸을 원하는 값으로 (빈 값이면 지움)
+  setCell: function (req) {
+    return withLock_(function () {
+      var sh = sheet_(), T = table_(sh);
+      var row = T.rows[findIdx_(T, req)];
+      var u = T.L.units.filter(function (x) { return x.label === norm_(req.unit); })[0];
+      if (!u) throw new Error('Day 칸을 찾지 못했습니다: ' + req.unit);
+      var cell = sh.getRange(row.r, u.col + 1);
+      if (String(req.value || '').trim()) cell.setNumberFormat('@').setValue(String(req.value).trim()); else cell.clearContent();
+      return { ok: true };
+    });
+  },
+  // { maxDays? } — 표 다시 정리 (이름 없는 줄 제거, 병합·회색 칸 다시 맞춤)
+  tidy: function (req) {
+    return withLock_(function () { var sh = sheet_(); writeTable_(sh, table_(sh), req.maxDays); return { ok: true }; });
+  }
+};
 
 // =====================================================================
 // 단어장 탭 (교재마다 탭 하나: Day | 영어 | 뜻 | 단원 이름)

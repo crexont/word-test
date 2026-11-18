@@ -316,3 +316,6 @@ body.view-prog .books, body.view-prog #work { display: none !important; }
 .btn.danger { border-color: var(--warn); color: var(--warn); }
 .ptable .c-act .btn.edit { padding: 3px 7px; }
 @media print { .stu-dlg { display: none !important; } }
+
+.switch.duplex { margin-top: 2px; font-size: 13px; }
+.switch.duplex small { margin: 0 0 0 2px; }
