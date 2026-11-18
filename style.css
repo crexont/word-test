@@ -131,7 +131,7 @@ body.view-prog .books, body.view-prog #work { display: none !important; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .b-scope.deriv { background: #1f3a30; color: #7fd8b0; } }
 
 /* 작업 영역 */
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) clamp(360px, 33%, 500px); min-height: 100vh; max-width: 1440px; margin: 0 auto; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) clamp(360px, 33%, 500px); min-height: 100vh; max-width: 1640px; margin: 0 auto; }
 .left { min-width: 0; }
 .work {
   display: grid; gap: 10px; padding: 0 24px 8px; align-items: start;
@@ -414,6 +414,3 @@ body.view-prog.pmode-sheet .layout { grid-template-columns: minmax(0, 1fr); }
 .btn.retest-btn:hover { background: rgba(217,83,79,.1); }
 .btn.retest-btn.on { background: #d9534f; color: #fff; }
 @media print { .sp-table td.re { background: #f4cccc; color: #990000; font-size: 5.6pt; letter-spacing: -0.3pt; } }
-
-/* 진도표 화면은 조금 더 넓게 (학생 목록이 잘리지 않을 만큼) */
-body.view-prog .layout { max-width: 1640px; }
