@@ -559,6 +559,25 @@
     paginate(container, makePage, els);
   }
 
+  // 답지: 한 장에 다 들어가는 가장 큰 글자 크기로 (15px → 9px). 9px로도 넘치면 읽기 좋은 11px로 여러 장
+  var ANS_SIZES = [15, 14, 13.5, 13, 12.5, 12, 11.5, 11, 10.5, 10, 9.5, 9];
+  function renderAnswersFit(qs, s, title, opt) {
+    var box = (opt && opt.into) || $('answerPages');
+    var fits = function (i) {
+      box.style.setProperty('--afs', ANS_SIZES[i] + 'px');
+      renderAnswers(qs, s, title, opt);
+      return box.querySelectorAll('.page').length <= 1;
+    };
+    // 이진 탐색: 들어가는 가장 큰 크기 찾기
+    var lo = 0, hi = ANS_SIZES.length - 1, best = -1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (fits(mid)) { best = mid; hi = mid - 1; } else lo = mid + 1;
+    }
+    var pick = best >= 0 ? best : ANS_SIZES.indexOf(11);
+    if (box.style.getPropertyValue('--afs') !== ANS_SIZES[pick] + 'px' || best < 0) fits(pick);
+  }
+
   // 미리보기를 칸 너비에 맞게 축소
   function fitPreview() {
     var area = $('previewArea'), scaler = $('scaler'), sizer = $('sizer');
@@ -609,7 +628,7 @@
     $('testPages').innerHTML = '';
     $('answerPages').innerHTML = '';
     renderTestFit(qs, s, title, { into: $('testPages') });
-    renderAnswers(qs, s, title, { into: $('answerPages') });
+    renderAnswersFit(qs, s, title, { into: $('answerPages') });
     fitPreview();
   }
 
@@ -1181,7 +1200,7 @@
         var aw = document.createElement('div'); aw.className = 'student-set';
         aw.setAttribute('data-student', i); aw.setAttribute('data-kind', 'answer');
         (ps.ans === 'each' ? testBox : ansBox).appendChild(aw);
-        renderAnswers(qs, s, title, { into: aw, name: j.row.name, heading: heading });
+        renderAnswersFit(qs, s, title, { into: aw, name: j.row.name, heading: heading });
       });
       fitPreview();
     }).catch(function (err) {

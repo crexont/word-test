@@ -267,11 +267,11 @@ body.view-prog .books, body.view-prog #work { display: none !important; }
 .ans-head .t { font-size: 16px; font-weight: 700; }
 .ans-head .s { font-size: 11px; color: #333; }
 .answer .page-body { column-gap: 6mm; }
-.a { font-size: 11px; line-height: 1.35; padding-bottom: 1.2mm; break-inside: avoid; display: flex; gap: 1.5mm; }
+.a { font-size: var(--afs, 11px); line-height: 1.35; padding-bottom: calc(var(--afs, 11px) * 0.4); break-inside: avoid; display: flex; gap: 1.5mm; }
 .a .an { flex: none; min-width: 2.2em; text-align: right; color: #444; }
 .a .aw { font-weight: 700; }
-.a .ty { font-size: 9px; color: #666; border: 1px solid #999; border-radius: 2px; padding: 0 2px; margin-right: 1mm; }
-.a-sec { font-size: 11px; font-weight: 700; padding: 1mm 0 1.5mm; }
+.a .ty { font-size: calc(var(--afs, 11px) * 0.82); color: #666; border: 1px solid #999; border-radius: 2px; padding: 0 2px; margin-right: 1mm; }
+.a-sec { font-size: var(--afs, 11px); font-weight: 700; padding: 1mm 0 1.5mm; }
 
 /* ===== 좁은 화면 ===== */
 @media (max-width: 960px) {
