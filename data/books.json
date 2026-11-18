@@ -2,6 +2,7 @@
   { "id":  "wordmaster-2000", "title":  "워드마스터 수능 2000", "short":  "수능2000", "file":  "data/wordmaster-2000.json", "cover":  "data/covers/wordmaster-2000.jpg", "scope":  "표제어만", "maxDay":  50, "sheetColor":  "#f4b183" },
   { "id":  "neungyule-suneung", "title":  "능률VOCA 수능 필수", "short":  "수능필수", "file":  "data/neungyule-suneung.json", "cover":  "data/covers/neungyule-suneung.jpg", "scope":  "표제어만", "maxDay":  60, "sheetColor":  "#c6e0b4" },
   { "id":  "neungyule-jungdeung", "title":  "능률VOCA 중등 기본", "short":  "중등기본", "file":  "data/neungyule-jungdeung.json", "cover":  "data/covers/neungyule-jungdeung.jpg", "scope":  "표제어만", "maxDay":  50, "sheetColor":  "#ffe599" },
+  { "id":  "neungyule-jungpilsu", "title":  "능률VOCA 중등 필수", "short":  "중등필수", "file":  "data/neungyule-jungpilsu.json", "cover":  "data/covers/neungyule-jungpilsu.jpg", "scope":  "표제어만", "maxDay":  50, "sheetColor":  "#d5a6bd" },
   { "id":  "neungyule-gibon", "title":  "능률VOCA 고등 기본", "short":  "고등기본", "file":  "data/neungyule-gibon.json", "cover":  "data/covers/neungyule-gibon.jpg", "scope":  "표제어만", "maxDay":  40, "sheetColor":  "#9fc5e8" },
   { "id":  "neungyule-eowon", "title":  "능률VOCA 어원편 고등", "short":  "어원편고등", "file":  "data/neungyule-eowon.json", "cover":  "data/covers/neungyule-eowon.jpg", "scope":  "표제어+파생어", "maxDay":  60, "sheetColor":  "#e46c0a" },
   { "id":  "vocaclear-suneung", "title":  "보카클리어 수능편", "short":  "보카클리어", "file":  "data/vocaclear-suneung.json", "cover":  "data/covers/vocaclear-suneung.jpg", "scope":  "표제어만", "maxDay":  50, "sheetColor":  "#f4a6a6" }
