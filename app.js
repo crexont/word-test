@@ -625,25 +625,32 @@
   }
 
   // ---------- 인쇄 ----------
-  // 양면 인쇄: 학생마다 새 장(앞면)에서 시작하도록, 쪽 수가 홀수인 학생 뒤에 빈 쪽을 하나 넣는다
-  //  - 시험지만: 학생별 시험지 / 시험지+답지(학생마다): 학생별 시험지+답지 / 답지 맨 뒤: 시험지만 맞춤
-  //  - 답지만 인쇄할 때는 넣지 않음 (선생님용)
+  // 양면 인쇄: 시험지와 답지가 각각 새 장(앞면)에서 시작하도록, 쪽 수가 홀수인 묶음 뒤에 빈 쪽을 넣는다
+  //  - 묶음 = 시험지 만들기: 시험지 / 답지, 진도표: 학생별 시험지 / 학생별 답지
+  //  - 시험지 뒷면에 답지가 인쇄되지 않고, 다음 학생도 새 장에서 시작
+  //  - 진도표에서 답지를 맨 뒤에 모을 때와 "답지만" 인쇄할 때는 빈 쪽 없이 이어서 (선생님용)
+  //  - 인쇄되는 마지막 쪽 뒤에는 넣지 않음
+  function duplexOn() { return $('genDuplex').checked; }
   function addDuplexPads(kind) {
     qsa('.page.pad-page').forEach(function (p) { p.remove(); });
-    if (view !== 'prog' || !$('progDuplex').checked || kind === 'answer') return;
-    var ansEach = (radioValue('progAns') || 'each') === 'each';
-    var groups = {};
-    qsa('#scaler .student-set').forEach(function (w) {
-      var k = w.getAttribute('data-kind');
-      if (k === 'answer' && !(kind === 'both' && ansEach)) return;
-      var key = w.getAttribute('data-student');
-      (groups[key] = groups[key] || []).push(w);
-    });
-    Object.keys(groups).forEach(function (key) {
-      var pages = [];
-      groups[key].forEach(function (w) { pages = pages.concat(Array.prototype.slice.call(w.querySelectorAll('.page'))); });
-      if (pages.length % 2 === 0) return;
+    if (!duplexOn() || kind === 'answer') return; // 답지만 인쇄(선생님용)는 빈 쪽 없이 이어서
+    var shows = function (pg) { return kind === 'both' || pg.classList.contains(kind); };
+    var groups;
+    if (view === 'prog') {
+      var ansEach = (radioValue('progAns') || 'each') === 'each';
+      groups = qsa('#scaler .student-set').filter(function (w) {
+        return w.getAttribute('data-kind') === 'test' || ansEach;
+      });
+    } else {
+      groups = [$('testPages'), $('answerPages')];
+    }
+    var all = qsa('#scaler .page').filter(shows);
+    var lastPrinted = all[all.length - 1];
+    groups.forEach(function (g) {
+      var pages = Array.prototype.slice.call(g.querySelectorAll('.page')).filter(shows);
+      if (!pages.length || pages.length % 2 === 0) return;
       var last = pages[pages.length - 1];
+      if (last === lastPrinted) return;
       var pad = document.createElement('div');
       pad.className = 'page pad-page ' + (last.classList.contains('answer') ? 'answer' : 'test');
       last.parentNode.insertBefore(pad, last.nextSibling);
@@ -1209,8 +1216,16 @@
     });
     $('progDate').addEventListener('change', function () { renderBatchSoon(); });
     $('progDate').value = todayStr();
-    $('progDuplex').checked = lsGet('wordTest.duplex') !== 'off';
-    $('progDuplex').addEventListener('change', function () { lsSet('wordTest.duplex', $('progDuplex').checked ? 'on' : 'off'); });
+    // 양면 인쇄 스위치: 시험지 만들기 탭과 진도표 탭이 같은 설정을 쓴다
+    var dup = lsGet('wordTest.duplex') !== 'off';
+    ['genDuplex', 'progDuplex'].forEach(function (id) {
+      $(id).checked = dup;
+      $(id).addEventListener('change', function () {
+        var on = $(id).checked;
+        $('genDuplex').checked = on; $('progDuplex').checked = on;
+        lsSet('wordTest.duplex', on ? 'on' : 'off');
+      });
+    });
     var dflt = lsGet('wordTest.dayDefault');
     if (dflt) $('progDefault').value = dflt;
     $('progDefault').addEventListener('change', function () {

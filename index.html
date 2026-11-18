@@ -8,7 +8,7 @@
   // 저장된 화면 모드를 먼저 적용해 깜빡임 방지
   try { var t = localStorage.getItem('wordTest.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
 </script>
-<link rel="stylesheet" href="style.css?v=20261119a">
+<link rel="stylesheet" href="style.css?v=20261119b">
 </head>
 <body>
 <div class="layout">
@@ -81,7 +81,7 @@
             </div>
           </div>
           <label class="field">날짜<input type="date" id="progDate"></label>
-          <label class="switch duplex"><input type="checkbox" id="progDuplex" checked><span class="knob"></span><span>양면 인쇄 <small class="tiny">학생마다 새 장에서 시작</small></span></label>
+          <label class="switch duplex"><input type="checkbox" id="progDuplex" checked><span class="knob"></span><span>양면 인쇄 <small class="tiny">답지·다음 학생은 새 장에서</small></span></label>
         </div>
 
         <div class="block prog-list">
@@ -158,6 +158,9 @@
         <div class="opt-row"><span>첫 글자 힌트</span>
           <label class="switch"><input type="checkbox" id="hint"><span class="knob"></span><span class="tiny">스펠링 문제</span></label>
         </div>
+        <div class="opt-row"><span>양면 인쇄</span>
+          <label class="switch"><input type="checkbox" id="genDuplex" checked><span class="knob"></span><span class="tiny">답지는 새 장에서</span></label>
+        </div>
         <div class="field-row">
           <label class="field grow"><span class="field-label">시험 제목 <button type="button" class="link-btn" id="titleReset" hidden>↺ 자동</button></span><input type="text" id="title"></label>
           <label class="field date">날짜<input type="date" id="date"></label>
@@ -215,6 +218,6 @@
   <option value="중1"><option value="중2"><option value="중3"><option value="고1"><option value="고2"><option value="고3">
 </datalist>
 
-<script src="app.js?v=20261119a"></script>
+<script src="app.js?v=20261119b"></script>
 </body>
 </html>
