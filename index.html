@@ -8,7 +8,7 @@
   // 저장된 화면 모드를 먼저 적용해 깜빡임 방지
   try { var t = localStorage.getItem('wordTest.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
 </script>
-<link rel="stylesheet" href="style.css?v=20261118w">
+<link rel="stylesheet" href="style.css?v=20261118x">
 </head>
 <body>
 <div class="layout">
@@ -44,9 +44,28 @@
             <input type="password" id="adminKey" autocomplete="off" spellcheck="false">
           </label>
         </div>
+        <div class="field-row when-disconnected">
+          <label class="field grow">구글 시트 주소 ("시트" 화면에 띄울 진도표, 없으면 비워 두세요)
+            <input type="url" id="sheetDocUrl" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off" spellcheck="false">
+          </label>
+        </div>
       </div>
 
-      <div class="prog-grid">
+      <div class="pmode-bar">
+        <div class="seg">
+          <label><input type="radio" name="pmode" value="list" checked><span>목록</span></label>
+          <label><input type="radio" name="pmode" value="sheet"><span>시트</span></label>
+        </div>
+        <a class="btn small" id="sheetOpen" target="_blank" rel="noopener" hidden>새 창에서 열기 ↗</a>
+        <span class="tiny" id="pmodeNote"></span>
+      </div>
+
+      <div class="sheet-frame-box" id="sheetFrameBox" hidden>
+        <p class="empty" id="sheetFrameMsg" hidden></p>
+        <iframe id="sheetFrame" title="구글 시트 진도표" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
+
+      <div class="prog-grid" id="progGrid">
         <div class="block prog-opts">
           <div class="block-head">
             <h2>인쇄 설정</h2>
@@ -215,6 +234,6 @@
   <option value="중1"><option value="중2"><option value="중3"><option value="고1"><option value="고2"><option value="고3">
 </datalist>
 
-<script src="app.js?v=20261118w"></script>
+<script src="app.js?v=20261118x"></script>
 </body>
 </html>

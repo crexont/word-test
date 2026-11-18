@@ -818,7 +818,11 @@
     lsSet(SHEET_KEY, url);
     prog.adminKey = $('adminKey').value.trim();
     lsSet('wordTest.adminKey', prog.adminKey);
+    prog.docUrl = $('sheetDocUrl').value.trim();
+    lsSet('wordTest.sheetDoc', prog.docUrl);
+    $('sheetFrame').removeAttribute('src');
     loadSheet();
+    if (pmode === 'sheet') setPMode('sheet');
   }
 
   function loadSheet() {
@@ -1067,6 +1071,41 @@
     });
   }
 
+  // ---------- 진도표: 목록 / 시트(구글 시트 화면 그대로) ----------
+  var pmode = 'list';
+  // 구글 시트 주소 → 화면 안에 넣을 편집 주소 (탭 위치 #gid는 유지)
+  function sheetEmbedUrl(u) {
+    var m = /\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/.exec(u || '');
+    if (!m) return '';
+    var gid = /[#&?]gid=(\d+)/.exec(u);
+    return 'https://docs.google.com/spreadsheets/d/' + m[1] + '/edit?usp=sharing' + (gid ? '#gid=' + gid[1] : '');
+  }
+  function setPMode(m) {
+    var was = pmode;
+    pmode = m === 'sheet' ? 'sheet' : 'list';
+    lsSet('wordTest.pmode', pmode);
+    qsa('input[name="pmode"]').forEach(function (r) { r.checked = r.value === pmode; });
+    var src = sheetEmbedUrl(prog.docUrl);
+    $('sheetOpen').hidden = !src;
+    if (src) $('sheetOpen').href = src;
+    $('progGrid').hidden = pmode === 'sheet';
+    $('sheetFrameBox').hidden = pmode !== 'sheet';
+    $('pmodeNote').textContent = pmode === 'sheet' ? '시트에서 고친 내용은 "목록"으로 돌아오면 반영됩니다. 화면이 안 보이면 "새 창에서 열기"를 쓰세요.' : '';
+    if (pmode === 'sheet') {
+      if (!src) {
+        $('sheetFrame').hidden = true;
+        $('sheetFrameMsg').textContent = '"주소 변경"을 눌러 구글 시트 주소(https://docs.google.com/spreadsheets/d/…)를 넣어 주세요.';
+        $('sheetFrameMsg').hidden = false;
+      } else {
+        $('sheetFrameMsg').hidden = true;
+        $('sheetFrame').hidden = false;
+        if ($('sheetFrame').getAttribute('src') !== src) $('sheetFrame').setAttribute('src', src);
+      }
+    } else if (was === 'sheet' && prog.url) {
+      loadSheet(); // 시트에서 고친 내용 반영
+    }
+  }
+
   // ---------- 학생 관리 (관리 키 필요) ----------
   var editing = null; // 수정 중인 학생 줄 (추가면 null)
   function maxDaysMap() {
@@ -1183,6 +1222,10 @@
     prog.grade = lsGet('wordTest.grade');
     prog.adminKey = lsGet('wordTest.adminKey');
     $('adminKey').value = prog.adminKey;
+    prog.docUrl = lsGet('wordTest.sheetDoc');
+    $('sheetDocUrl').value = prog.docUrl;
+    qsa('input[name="pmode"]').forEach(function (r) { r.addEventListener('change', function () { setPMode(r.value); }); });
+    setPMode(lsGet('wordTest.pmode') || 'list');
     $('stuAdd').addEventListener('click', function () { openStudent(null); });
     $('stuForm').addEventListener('submit', function (e) { e.preventDefault(); saveStudent(); });
     $('stuCancel').addEventListener('click', function () { $('stuDlg').close(); });
