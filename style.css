@@ -345,8 +345,7 @@ body.view-prog.pmode-sheet .layout { grid-template-columns: minmax(0, 1fr); }
 .ptable .c-cnt { width: 60px; white-space: nowrap; }
 .ptable .c-next { width: 96px; }
 .ptable .c-last { width: auto; overflow: hidden; text-overflow: ellipsis; }
-.ptable .c-prog { width: 62px; }
-.ptable .c-prog .bar { width: 22px; }
+.ptable .c-prog { width: 84px; }
 .ptable .c-act { width: 186px; text-align: right; }
 @media (max-width: 960px) { .ptable { table-layout: auto; } }
 
