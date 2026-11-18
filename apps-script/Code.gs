@@ -16,8 +16,16 @@
 // 진도표가 있는 시트(탭) 이름. 비워 두면 첫 번째 시트를 씁니다.
 var SHEET_NAME = '';
 
-// 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭, 6: 관리 기능 안정화)
-var VERSION = 6;
+// 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭, 6: 관리 기능 안정화, 7: 서식 유지)
+var VERSION = 7;
+
+// 진도표 '교재' 칸 색 (교재 약칭 기준, 띄어쓰기 무시). 여기 없는 교재는 원래 칠해 둔 색을 유지합니다.
+var BOOK_COLORS = {
+  '수능2000': '#f4b183',   // 연주황
+  '어원편고등': '#f4b183', // 연주황
+  '보카클리어': '#f4a6a6', // 연한 빨강
+  '수능필수': '#c6e0b4'    // 연초록
+};
 
 var UNIT_RE = /^\d+\s*[-~]\s*\d+$|^\d+$/;
 
@@ -205,6 +213,11 @@ function placeIdx_(rows, grade, book) {
   return rows.length;
 }
 
+function bookColor_(book) {
+  var k = String(book || '').replace(/\(.*?\)/g, '').replace(/\s+/g, '');
+  return BOOK_COLORS[k] || null;
+}
+
 function setRow_(T, row, grade, book) {
   var L = T.L;
   row.grade = L.iGrade >= 0 ? grade : '';
@@ -220,14 +233,56 @@ function writeTable_(sh, T, maxDays) {
   if (sh.getMaxRows() < T.first + n - 1) sh.insertRowsAfter(sh.getMaxRows(), T.first + n - 1 - sh.getMaxRows());
   // 머리글 아래 데이터 영역 전체를 한 번에 정리 (병합을 모두 포함하므로 "일부 병합" 오류가 나지 않음)
   var area = sh.getRange(T.first, 1, span, W);
+
+  // 다시 쓰기 전에 학년·교재 칸 색을 묶음별로 기억 (색이 줄 위치가 아니라 묶음을 따라가도록)
+  var colors = { grade: {}, book: {} };
+  function remember(col, kind, keyOf) {
+    if (col < 0) return;
+    var top = T.rows.reduce(function (m, x) { return x.r ? Math.max(m, x.r) : m; }, T.first);
+    var len = top - T.first + 1;
+    var bgs = sh.getRange(T.first, col + 1, len, 1).getBackgrounds();
+    var fcs = sh.getRange(T.first, col + 1, len, 1).getFontColors();
+    T.rows.slice().sort(function (a, b) { return (a.r || 1e9) - (b.r || 1e9); }).forEach(function (x) {
+      if (!x.r) return;
+      var k = keyOf(x);
+      if (!colors[kind][k]) colors[kind][k] = { bg: bgs[x.r - T.first][0], fc: fcs[x.r - T.first][0] };
+    });
+  }
+  remember(L.iGrade, 'grade', function (x) { return x.grade; });
+  remember(L.iBook, 'book', function (x) { return x.grade + '|' + x.book; });
+
   area.breakApart();
   area.clearContent();
   if (L.units.length) {
     var c0 = L.units[0].col, nc = L.units[L.units.length - 1].col - c0 + 1;
     sh.getRange(T.first, c0 + 1, span, nc).setBackground(null).setNumberFormat('@');
   }
+  // 표 아래로 남는 줄은 서식도 지움 (학생이 줄었을 때)
+  if (span > n) {
+    sh.getRange(T.first + n, 1, span - n, W)
+      .setBorder(false, false, false, false, false, false)
+      .setBackground(null).setFontWeight('normal').setFontColor(null);
+  }
   if (!n) return;
-  sh.getRange(T.first, 1, n, W).setValues(T.rows.map(function (x) { return x.v; }));
+  var table = sh.getRange(T.first, 1, n, W);
+  table.setValues(T.rows.map(function (x) { return x.v; }));
+  // 학생 수와 상관없이 같은 모양: 테두리, 이름 굵게·가운데, Day 칸 가운데·작은 글씨
+  table.setBorder(true, true, true, true, true, true, '#bfbfbf', SpreadsheetApp.BorderStyle.SOLID).setVerticalAlignment('middle');
+  sh.getRange(T.first, L.iName + 1, n, 1).setFontWeight('bold').setHorizontalAlignment('center');
+  if (L.units.length) sh.getRange(T.first, L.units[0].col + 1, n, L.units[L.units.length - 1].col - L.units[0].col + 1).setHorizontalAlignment('center').setFontSize(9);
+  function paint(col, kind, keyAt) {
+    if (col < 0) return;
+    var bg = [], fc = [];
+    for (var k = 0; k < n; k++) {
+      var cc = colors[kind][keyAt(k)] || {};
+      var fixed = kind === 'book' ? bookColor_(T.rows[k].book) : null;
+      bg.push([fixed || (cc.bg && cc.bg !== '#ffffff' ? cc.bg : null)]);
+      fc.push([fixed ? '#000000' : (cc.fc || null)]);
+    }
+    sh.getRange(T.first, col + 1, n, 1).setBackgrounds(bg).setFontColors(fc).setFontWeight('bold');
+  }
+  paint(L.iGrade, 'grade', function (k) { return T.rows[k].grade; });
+  paint(L.iBook, 'book', function (k) { return T.rows[k].grade + '|' + T.rows[k].book; });
 
   function mergeRuns(col, keyAt) {
     var s = 0;
