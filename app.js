@@ -559,23 +559,27 @@
     paginate(container, makePage, els);
   }
 
-  // 답지: 한 장에 다 들어가는 가장 큰 글자 크기로 (15px → 9px). 9px로도 넘치면 읽기 좋은 11px로 여러 장
-  var ANS_SIZES = [15, 14, 13.5, 13, 12.5, 12, 11.5, 11, 10.5, 10, 9.5, 9];
+  // 답지: 한 장에 다 들어가는 가장 큰 글자 크기로 (15px → 11px).
+  //  11px로도 한 장을 넘으면 두 장에 맞춰 다시 가장 큰 크기로 (세 장, 네 장 … 마찬가지)
+  var ANS_SIZES = [15, 14.5, 14, 13.5, 13, 12.5, 12, 11.5, 11];
   function renderAnswersFit(qs, s, title, opt) {
     var box = (opt && opt.into) || $('answerPages');
-    var fits = function (i) {
+    var cur = -1;
+    var pagesAt = function (i) {
+      cur = i;
       box.style.setProperty('--afs', ANS_SIZES[i] + 'px');
       renderAnswers(qs, s, title, opt);
-      return box.querySelectorAll('.page').length <= 1;
+      return box.querySelectorAll('.page').length;
     };
-    // 이진 탐색: 들어가는 가장 큰 크기 찾기
-    var lo = 0, hi = ANS_SIZES.length - 1, best = -1;
+    var last = ANS_SIZES.length - 1;
+    var limit = Math.max(1, pagesAt(last)); // 가장 작은 크기일 때 장수 = 목표 장수
+    // 그 장수 안에 들어가는 가장 큰 크기 (이진 탐색)
+    var lo = 0, hi = last - 1, best = last;
     while (lo <= hi) {
       var mid = (lo + hi) >> 1;
-      if (fits(mid)) { best = mid; hi = mid - 1; } else lo = mid + 1;
+      if (pagesAt(mid) <= limit) { best = mid; hi = mid - 1; } else lo = mid + 1;
     }
-    var pick = best >= 0 ? best : ANS_SIZES.indexOf(11);
-    if (box.style.getPropertyValue('--afs') !== ANS_SIZES[pick] + 'px' || best < 0) fits(pick);
+    if (cur !== best) pagesAt(best);
   }
 
   // 미리보기를 칸 너비에 맞게 축소
