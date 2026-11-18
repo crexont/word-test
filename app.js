@@ -756,8 +756,21 @@
   }
 
   // 칸 하나에 적힌 통과 날짜들 ("11/18, 2/3" → ['11/18', '2/3'])
-  function passesOf(row, u) {
+  //  '재11/18' 은 재시험 표시라 통과 날짜로 세지 않음
+  function partsOf(row, u) {
     return String(row.cells[u.label] || '').split(/[,\n]/).map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+  function passesOf(row, u) {
+    return partsOf(row, u).filter(function (s) { return s.charAt(0) !== '재'; });
+  }
+  // 다음 범위에 재시험 표시가 있으면 그 날짜 ('11/18'), 없으면 ''
+  function retestOf(row, st) {
+    if (!st.next) return '';
+    var d = '';
+    st.next.units.forEach(function (label) {
+      partsOf(row, { label: label }).forEach(function (s) { if (s.charAt(0) === '재') d = s.slice(1); });
+    });
+    return d;
   }
 
   // 학생 한 줄의 상태
@@ -922,13 +935,14 @@
         for (var n = 1; n <= 5; n++) cntOpts += '<option value="' + n + '"' + (n === st.count ? ' selected' : '') + '>' + n + '</option>';
         html += '<tr class="' + (on ? 'on' : '') + '">' +
           '<td class="c-chk"><input type="checkbox" data-r="' + row.r + '"' + (on ? ' checked' : '') + (st.book && st.next ? '' : ' disabled') + '></td>' +
-          '<td class="c-name">' + esc(row.name) + (st.round > 1 ? '<span class="round">' + st.round + '회독</span>' : '') + (row.note ? '<span class="note" title="' + esc(row.note) + '">' + esc(row.note) + '</span>' : '') + '</td>' +
+          '<td class="c-name">' + esc(row.name) + (st.round > 1 ? '<span class="round">' + st.round + '회독</span>' : '') + (retestOf(row, st) ? '<span class="retest" title="재시험 ' + esc(retestOf(row, st)) + '">재 ' + esc(retestOf(row, st)) + '</span>' : '') + (row.note ? '<span class="note" title="' + esc(row.note) + '">' + esc(row.note) + '</span>' : '') + '</td>' +
           '<td class="c-cnt"><select data-cnt="' + row.r + '" title="이번에 볼 Day 수"' + (st.book ? '' : ' disabled') + '>' + cntOpts + '</select><span class="lbl">개</span></td>' +
           '<td class="c-next"><span class="lbl">다음</span> <b>' + esc(nextTxt) + '</b></td>' +
-          '<td class="c-last"><span class="lbl">최근</span> ' + esc(lastTxt) + '</td>' +
+          '<td class="c-last" title="' + esc(lastTxt) + '"><span class="lbl">최근</span> ' + esc(lastTxt) + '</td>' +
           '<td class="c-prog"><span class="bar"><i style="width:' + (st.total ? Math.round(st.done / st.total * 100) : 0) + '%"></i></span> ' + st.done + '/' + st.total + '</td>' +
           '<td class="c-act">' +
             '<button type="button" class="btn small pass" data-pass="' + row.r + '"' + (st.book && st.next && canWrite ? '' : ' disabled') + ' title="' + (st.next ? 'Day ' + esc(st.next.label) + ' 통과로 오늘 날짜 기록' : '') + '">통과 ✓</button>' +
+            (prog.version >= 13 ? '<button type="button" class="btn small retest-btn' + (retestOf(row, st) ? ' on' : '') + '" data-retest="' + row.r + '"' + (st.book && st.next ? '' : ' disabled') + ' title="' + (retestOf(row, st) ? '재시험 표시 지우기' : '다음 범위를 재시험으로 표시 (진도표 칸에 재+날짜)') + '">재시험</button>' : '') +
             '<button type="button" class="btn small undo" data-undo="' + row.r + '"' + (st.last && canWrite ? '' : ' disabled') + ' title="마지막 통과 기록 지우기">↶</button>' +
             (canAdmin ? '<button type="button" class="btn small edit" data-edit="' + row.r + '" title="학생 정보 수정·삭제">✎</button>' : '') +
           '</td></tr>';
@@ -972,6 +986,18 @@
     qsa('#progTable [data-edit]').forEach(function (b) {
       b.addEventListener('click', function () { openStudent(prog.data.rows.find(function (x) { return x.r === +b.getAttribute('data-edit'); })); });
     });
+    qsa('#progTable [data-retest]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (prog.busy) return;
+        var row = prog.data.rows.find(function (x) { return x.r === +b.getAttribute('data-retest'); });
+        var st = studentInfo(row);
+        if (!st.next) return;
+        if (retestOf(row, st)) {
+          if (!confirm(row.name + ' — Day ' + st.next.label + ' 재시험 표시를 지울까요?')) return;
+          recordRows([{ row: row, st: st, pass: false, clear: true }]);
+        } else recordRows([{ row: row, st: st, pass: false }]);
+      });
+    });
     qsa('#progTable [data-undo]').forEach(function (b) {
       b.addEventListener('click', function () { markPass(+b.getAttribute('data-undo'), true); });
     });
@@ -982,7 +1008,7 @@
     if (prog.busy) return;
     var row = prog.data.rows.find(function (x) { return x.r === r; });
     var st = studentInfo(row);
-    if (!undo && prog.version >= 12) { recordRows([{ row: row, st: st, score: '', pass: true }]); return; }
+    if (!undo && prog.version >= 12) { recordRows([{ row: row, st: st, pass: true }]); return; }
     var range = undo ? (st.last && st.last.range) : st.next;
     if (!range) return;
     if (undo && !confirm(row.name + ' — Day ' + range.label + ' 통과 기록(' + st.last.date + ')을 지울까요?')) return;
@@ -1036,7 +1062,7 @@
       html += '<section class="sp-page">' +
         '<div class="sp-head"><b>VOCA 진도표</b>' + (gf ? ' <span>' + esc(gf) + '</span>' : '') +
         ' <span>Day ' + ch[0].a + '–' + ch[ch.length - 1].b + '</span>' +
-        '<em>' + esc(today) + ' · 초록 = 통과(날짜) · 진초록 = 2회독 이상</em></div>' +
+        '<em>' + esc(today) + ' · 초록 = 통과(날짜) · 진초록 = 2회독 이상 · 빨강 = 재시험</em></div>' +
         '<table class="sp-table"><colgroup><col class="sp-g"><col class="sp-b"><col class="sp-n">' +
         ch.map(function () { return '<col>'; }).join('') + '</colgroup><thead><tr><th>학년</th><th>교재</th><th>이름</th>' +
         ch.map(function (u) { return '<th' + (u.b % 5 ? '' : ' class="b5"') + '>' + esc(u.label) + '</th>'; }).join('') + '</tr></thead>';
@@ -1053,7 +1079,8 @@
             ch.map(function (u) {
               var b5 = u.b % 5 ? '' : ' b5';
               if (max && u.a > max) return '<td class="out' + b5 + '"></td>';
-              var ps = passesOf(row, u);
+              var ps = passesOf(row, u), re = partsOf(row, u).filter(function (s) { return s.charAt(0) === '재'; });
+              if (re.length) return '<td class="re' + b5 + '">' + esc(re[re.length - 1]) + '</td>';
               if (!ps.length) return b5 ? '<td class="b5"></td>' : '<td></td>';
               return '<td class="' + (ps.length > 1 ? 'p2' : 'p1') + b5 + '">' + esc(ps[ps.length - 1]) + (ps.length > 1 ? '<sup>' + ps.length + '</sup>' : '') + '</td>';
             }).join('') + '</tr>';
@@ -1079,7 +1106,7 @@
       return p.then(function () {
         if (fail) return;
         return api('POST', { action: 'record', r: x.row.r, name: x.row.name, units: x.st.next.units, range: x.st.next.label,
-          score: '', total: '', pass: true })
+          pass: !!x.pass, clear: !!x.clear })
           .then(function (j) {
             Object.keys(j.values || {}).forEach(function (k) { x.row.cells[k] = j.values[k]; });
             prog.selected.delete(x.row.r);
@@ -1090,7 +1117,7 @@
     }, Promise.resolve()).then(function () {
       prog.busy = false;
       var msg = fail ? ['기록하다 멈췄습니다: ' + fail.message, 'err']
-        : ['통과 기록함: ' + list.map(function (x) { return x.row.name + ' Day ' + x.st.next.label; }).join(', '), 'ok'];
+        : [(list[0].pass ? '통과 기록함: ' : list[0].clear ? '재시험 표시 지움: ' : '재시험 표시함: ') + list.map(function (x) { return x.row.name + ' Day ' + x.st.next.label; }).join(', '), 'ok'];
       // 시트를 다시 불러온 뒤 결과 문구를 보여 줌
       loadSheet().then(function () { setStatus(msg[0], msg[1]); });
     });

@@ -341,12 +341,13 @@ body.view-prog.pmode-sheet .layout { grid-template-columns: minmax(0, 1fr); }
 /* 학생 목록: 묶음이 달라도 칸 위치가 같게 (최근 칸이 남는 폭을 씀) */
 .ptable { table-layout: fixed; }
 .ptable .c-chk { width: 26px; }
-.ptable .c-name { width: 104px; overflow: hidden; text-overflow: ellipsis; }
-.ptable .c-cnt { width: 64px; white-space: nowrap; }
-.ptable .c-next { width: 100px; }
+.ptable .c-name { width: 128px; overflow: hidden; text-overflow: ellipsis; }
+.ptable .c-cnt { width: 60px; white-space: nowrap; }
+.ptable .c-next { width: 96px; }
 .ptable .c-last { width: auto; overflow: hidden; text-overflow: ellipsis; }
-.ptable .c-prog { width: 76px; }
-.ptable .c-act { width: 142px; text-align: right; }
+.ptable .c-prog { width: 62px; }
+.ptable .c-prog .bar { width: 22px; }
+.ptable .c-act { width: 186px; text-align: right; }
 @media (max-width: 960px) { .ptable { table-layout: auto; } }
 
 /* 진도표 인쇄 (A4 가로) */
@@ -406,3 +407,11 @@ body.view-prog.pmode-sheet .layout { grid-template-columns: minmax(0, 1fr); }
   .ptable .c-last { grid-area: last; font-size: 12px; color: var(--muted); }
   .ptable .c-act { grid-area: act; text-align: right; }
 }
+
+/* 재시험 */
+.ptable .retest { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 5px; font-size: 11px; font-weight: 700; background: #fde2e1; color: #b42318; }
+:root[data-theme="dark"] .ptable .retest { background: #4a1f1d; color: #ff9a92; }
+.btn.retest-btn { border-color: #d9534f; color: #d9534f; font-weight: 600; }
+.btn.retest-btn:hover { background: rgba(217,83,79,.1); }
+.btn.retest-btn.on { background: #d9534f; color: #fff; }
+@media print { .sp-table td.re { background: #f4cccc; color: #990000; font-size: 5.6pt; letter-spacing: -0.3pt; } }

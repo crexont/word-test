@@ -17,7 +17,7 @@
 var SHEET_NAME = '';
 
 // 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭, 6: 관리 기능 안정화, 7: 서식 유지, 8: 교재 색을 사이트에서 지정, 9: 시트 보기 좋게)
-var VERSION = 12;
+var VERSION = 13;
 
 // 진도표 '교재' 칸 색 (교재 약칭 기준, 띄어쓰기 무시). 여기 없는 교재는 원래 칠해 둔 색을 유지합니다.
 var BOOK_COLORS = {
@@ -384,15 +384,20 @@ function styleSheet_(sh, T) {
     if (b % 5 === 0) sh.getRange(head, u.col + 1, n + 1, 1).setBorder(null, null, null, true, null, null, '#8c8c8c', BS.SOLID_MEDIUM);
   });
 
-  // 통과한 칸 색 (조건부 서식이라 시트에 직접 적어도 자동으로 칠해짐)
-  if (L.units.length) {
-    var block = sh.getRange(first, L.units[0].col + 1, n, L.units[L.units.length - 1].col - L.units[0].col + 1);
-    var rules = [
-      SpreadsheetApp.newConditionalFormatRule().whenTextContains(',').setBackground('#93c47d').setRanges([block]).build(),
-      SpreadsheetApp.newConditionalFormatRule().whenCellNotEmpty().setBackground('#d9ead3').setRanges([block]).build()
-    ];
-    sh.setConditionalFormatRules(rules);
-  }
+  passColors_(sh, T);
+}
+
+// 통과한 칸 색 (조건부 서식이라 시트에 직접 적어도 자동으로 칠해짐)
+//  '재' 가 들어간 칸 = 재시험(연빨강), 쉼표 = 2회독 이상(진초록), 그 밖에 날짜 = 통과(초록)
+function passColors_(sh, T) {
+  var L = T.L, n = T.rows.length;
+  if (!L.units.length || !n) return;
+  var block = sh.getRange(T.first, L.units[0].col + 1, n, L.units[L.units.length - 1].col - L.units[0].col + 1);
+  sh.setConditionalFormatRules([
+    SpreadsheetApp.newConditionalFormatRule().whenTextContains('재').setBackground('#f4cccc').setFontColor('#990000').setRanges([block]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenTextContains(',').setBackground('#93c47d').setRanges([block]).build(),
+    SpreadsheetApp.newConditionalFormatRule().whenCellNotEmpty().setBackground('#d9ead3').setRanges([block]).build()
+  ]);
 }
 
 var ADMIN_ACTIONS = {
@@ -553,7 +558,10 @@ function lastLogs_() {
   return out;
 }
 
-// req: { r, name, units: ['7','8'], range: '7-8', score, total, pass }
+// req: { r, name, units: ['7','8'], range: '7-8', pass, clear }
+//  - 통과: 그 Day 칸들의 재시험 표시('재11/18')를 지우고 오늘 날짜를 이어 적음
+//  - 재시험: 그 Day 칸들에 '재오늘날짜' 표시 (전에 있던 재시험 표시는 바꿈). 통과 날짜로 세지 않음
+//  - 재시험 취소(clear): 재시험 표시만 지움
 function record_(req) {
   return withLock_(function () {
     var sh = sheet_(), T = table_(sh), L = T.L;
@@ -561,20 +569,22 @@ function record_(req) {
     var tz = Session.getScriptTimeZone(), now = new Date();
     var date = Utilities.formatDate(now, tz, 'M/d');
     var values = {};
-    if (req.pass) {
-      (req.units || []).forEach(function (label) {
-        var u = L.units.filter(function (x) { return x.label === norm_(label); })[0];
-        if (!u) throw new Error('Day 칸을 찾지 못했습니다: ' + label);
-        var cell = sh.getRange(row.r, u.col + 1);
-        var parts = String(cell.getDisplayValue() || '').split(/[,\n]/).map(function (s) { return s.trim(); }).filter(String);
-        parts.push(date);
-        values[label] = parts.join(', ');
-        cell.setNumberFormat('@').setValue(values[label]);
-      });
+    (req.units || []).forEach(function (label) {
+      var u = L.units.filter(function (x) { return x.label === norm_(label); })[0];
+      if (!u) throw new Error('Day 칸을 찾지 못했습니다: ' + label);
+      var cell = sh.getRange(row.r, u.col + 1);
+      var parts = String(cell.getDisplayValue() || '').split(/[,\n]/).map(function (s) { return s.trim(); })
+        .filter(function (s) { return s && s.charAt(0) !== '재'; });
+      if (req.pass) parts.push(date);
+      else if (!req.clear) parts.push('재' + date);
+      values[label] = parts.join(', ');
+      if (values[label]) cell.setNumberFormat('@').setValue(values[label]); else cell.clearContent();
+    });
+    if (!req.pass) passColors_(sh, T); // 예전 시트에도 재시험 색이 생기게
+    if (!req.clear) {
+      logSheet_(true).appendRow([Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'), row.grade, row.book, row.name,
+        'Day ' + String(req.range || ''), '', '', req.pass ? '통과' : '재시험']);
     }
-    var score = req.score === '' || req.score == null ? '' : Number(req.score);
-    logSheet_(true).appendRow([Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'), row.grade, row.book, row.name,
-      'Day ' + String(req.range || ''), score, req.total || '', req.pass ? '통과' : '재시험']);
     return { ok: true, date: date, values: values };
   });
 }
