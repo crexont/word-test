@@ -17,7 +17,7 @@
 var SHEET_NAME = '';
 
 // 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭, 6: 관리 기능 안정화, 7: 서식 유지, 8: 교재 색을 사이트에서 지정, 9: 시트 보기 좋게)
-var VERSION = 9;
+var VERSION = 10;
 
 // 진도표 '교재' 칸 색 (교재 약칭 기준, 띄어쓰기 무시). 여기 없는 교재는 원래 칠해 둔 색을 유지합니다.
 var BOOK_COLORS = {
@@ -332,9 +332,9 @@ function styleSheet_(sh, T) {
     var top = sh.getRange(1, 1, 2, W);
     var title = String(sh.getRange(1, 1).getDisplayValue() || '').trim() || 'VOCA 진도표';
     top.breakApart().clearContent();
-    sh.getRange(1, 1).setValue(title).setFontSize(15).setFontWeight('bold').setHorizontalAlignment('left').setVerticalAlignment('middle');
+    sh.getRange(1, 1).setValue(title).setFontSize(13).setFontWeight('bold').setHorizontalAlignment('left').setVerticalAlignment('middle');
     if (L.units.length) {
-      sh.getRange(1, L.units[0].col + 1).setValue('초록 = 통과 · 진초록 = 2회독 이상 · 회색 = 교재 범위 밖 · Day 칸에 통과 날짜 (사이트에서 통과 ✓ 누르면 자동 기록)')
+      sh.getRange(1, L.units[0].col + 1).setValue('초록 = 통과 · 진초록 = 2회독 이상 · 회색 = 교재 범위 밖')
         .setFontSize(9).setFontColor('#666666').setFontWeight('normal').setHorizontalAlignment('left').setVerticalAlignment('middle');
     }
     sh.setRowHeight(1, 34);
@@ -351,9 +351,9 @@ function styleSheet_(sh, T) {
   sh.setFrozenColumns(L.iName + 1);
 
   // 너비
-  if (L.iGrade >= 0) sh.setColumnWidth(L.iGrade + 1, 46);
-  if (L.iBook >= 0) sh.setColumnWidth(L.iBook + 1, 92);
-  sh.setColumnWidth(L.iName + 1, 70);
+  if (L.iGrade >= 0) sh.setColumnWidth(L.iGrade + 1, 48);
+  if (L.iBook >= 0) sh.setColumnWidth(L.iBook + 1, 100);
+  sh.setColumnWidth(L.iName + 1, 78);
   if (L.units.length) sh.setColumnWidths(L.units[0].col + 1, L.units.length, 40);
   if (L.iNote >= 0) sh.setColumnWidth(L.iNote + 1, 150);
   if (!n) return;
