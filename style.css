@@ -330,3 +330,9 @@ body.view-prog .books, body.view-prog #work { display: none !important; }
 /* 진도표 '시트' 화면: 오른쪽 미리보기 숨기고 시트를 넓게 */
 body.view-prog.pmode-sheet .preview { display: none; }
 body.view-prog.pmode-sheet .layout { grid-template-columns: minmax(0, 1fr); }
+
+/* 진도표 연결 상태 줄 + 관리 키 */
+.sheet-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 2px 2px 0; }
+.sheet-status .status { flex: 1; margin: 0; min-width: 200px; }
+.sheet-status .admin-key { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.sheet-status .admin-key input { width: 180px; border: 1px solid var(--line); border-radius: 7px; padding: 4px 8px; background: var(--surface); color: var(--text); font-size: 13px; }

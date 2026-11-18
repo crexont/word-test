@@ -666,7 +666,8 @@
   // =====================================================================
   // 진도표 (구글 시트 연결)
   // =====================================================================
-  var SHEET_KEY = 'wordTest.sheetUrl';
+  // 학원 진도표 Apps Script 주소 (학원 안에서만 쓰는 사이트라 코드에 고정)
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwV7Rh5ZPlqlChsNh7p897UNv7dJRSu0bABc1AfKPd9silYCJDRSo90AtN1RvEGyL_-fA/exec';
   var VIEW_KEY = 'wordTest.view';
   var prog = {
     url: '',
@@ -811,19 +812,14 @@
     el.className = 'tiny status ' + (kind || '');
   }
 
-  function connectSheet() {
-    var url = $('sheetUrl').value.trim();
-    if (!/^https?:\/\//.test(url)) { setStatus('주소를 확인하세요 (https://script.google.com/... 로 시작).', 'err'); return; }
-    prog.url = url;
-    lsSet(SHEET_KEY, url);
+  // 관리 키: 이 PC 브라우저에만 저장 (학생 추가·수정·삭제용)
+  function saveAdminKey() {
     prog.adminKey = $('adminKey').value.trim();
     lsSet('wordTest.adminKey', prog.adminKey);
-    prog.docUrl = $('sheetDocUrl').value.trim() || DEFAULT_SHEET_DOC;
-    lsSet('wordTest.sheetDoc', prog.docUrl === DEFAULT_SHEET_DOC ? '' : prog.docUrl);
-    $('sheetFrame').removeAttribute('src');
-    loadSheet();
-    if (pmode === 'sheet') setPMode('sheet');
+    renderProgList();
+    setStatus(prog.adminKey ? '관리 키를 저장했습니다.' : '관리 키를 지웠습니다.', 'ok');
   }
+
 
   function loadSheet() {
     if (!prog.url) { renderProgList(); return; }
@@ -1094,7 +1090,7 @@
     document.body.classList.toggle('pmode-sheet', pmode === 'sheet'); // 시트 화면에서는 미리보기 숨기고 넓게
     setTimeout(fitPreview, 50);
     $('sheetFrameBox').hidden = pmode !== 'sheet';
-    $('pmodeNote').textContent = pmode === 'sheet' ? '시트에서 고친 내용은 "목록"으로 돌아오면 반영됩니다. 화면이 안 보이면 "새 창에서 열기"를 쓰세요.' : '';
+    $('pmodeNote').textContent = pmode === 'sheet' ? '시트에서 고친 내용은 "목록"으로 돌아오면 반영됩니다.' : '';
     if (pmode === 'sheet') {
       if (!src) {
         $('sheetFrame').hidden = true;
@@ -1203,9 +1199,8 @@
     qsa('.tabs [data-view]').forEach(function (b) {
       b.addEventListener('click', function () { setView(b.getAttribute('data-view')); });
     });
-    $('sheetConnect').addEventListener('click', connectSheet);
-    $('sheetUrl').addEventListener('keydown', function (e) { if (e.key === 'Enter') connectSheet(); });
-    $('sheetEdit').addEventListener('click', function () { $('sheetBox').classList.remove('connected'); $('sheetUrl').focus(); });
+    $('adminKeySave').addEventListener('click', saveAdminKey);
+    $('adminKey').addEventListener('keydown', function (e) { if (e.key === 'Enter') saveAdminKey(); });
     $('progRefresh').addEventListener('click', loadSheet);
     $('progNone').addEventListener('click', function () { prog.selected.clear(); renderProgList(); renderBatchSoon(); });
     $('progShuffle').addEventListener('click', function () { renderBatchSoon(true); });
@@ -1222,19 +1217,17 @@
       lsSet('wordTest.dayDefault', $('progDefault').value);
       renderProgList(); renderBatchSoon();
     });
-    prog.url = lsGet(SHEET_KEY);
+    prog.url = SCRIPT_URL;
     prog.grade = lsGet('wordTest.grade');
     prog.adminKey = lsGet('wordTest.adminKey');
     $('adminKey').value = prog.adminKey;
-    prog.docUrl = lsGet('wordTest.sheetDoc') || DEFAULT_SHEET_DOC;
-    $('sheetDocUrl').value = prog.docUrl;
+    prog.docUrl = DEFAULT_SHEET_DOC;
     qsa('input[name="pmode"]').forEach(function (r) { r.addEventListener('change', function () { setPMode(r.value); }); });
     setPMode(lsGet('wordTest.pmode') || 'list');
     $('stuAdd').addEventListener('click', function () { openStudent(null); });
     $('stuForm').addEventListener('submit', function (e) { e.preventDefault(); saveStudent(); });
     $('stuCancel').addEventListener('click', function () { $('stuDlg').close(); });
     $('stuDelete').addEventListener('click', deleteStudent);
-    $('sheetUrl').value = prog.url;
   }
   window.addEventListener('afterprint', function () {
     document.body.classList.remove('print-test', 'print-answer', 'print-both');

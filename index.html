@@ -8,7 +8,7 @@
   // 저장된 화면 모드를 먼저 적용해 깜빡임 방지
   try { var t = localStorage.getItem('wordTest.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
 </script>
-<link rel="stylesheet" href="style.css?v=20261118z">
+<link rel="stylesheet" href="style.css?v=20261119a">
 </head>
 <body>
 <div class="layout">
@@ -26,29 +26,10 @@
 
     <!-- 진도표 화면 -->
     <div class="prog" id="progView" hidden>
-      <div class="block sheet-box" id="sheetBox">
-        <div class="block-head">
-          <h2>구글 시트 연결</h2>
-          <span class="tiny status" id="sheetStatus"></span>
-          <button type="button" class="link-btn when-connected" id="sheetEdit">주소 변경</button>
-        </div>
-        <div class="field-row when-disconnected">
-          <label class="field grow">Apps Script 웹 앱 주소
-            <input type="url" id="sheetUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" spellcheck="false">
-          </label>
-          <button type="button" class="btn primary" id="sheetConnect">연결</button>
-        </div>
-        <p class="tiny when-disconnected">주소는 이 컴퓨터의 브라우저에만 저장됩니다. 설정 방법은 README의 "진도표(구글 시트) 연결"을 보세요.</p>
-        <div class="field-row when-disconnected">
-          <label class="field grow">관리 키 (학생 추가·수정·삭제용, 없으면 비워 두세요)
-            <input type="password" id="adminKey" autocomplete="off" spellcheck="false">
-          </label>
-        </div>
-        <div class="field-row when-disconnected">
-          <label class="field grow">구글 시트 주소 ("시트" 화면에 띄울 진도표, 비우면 학원 진도표)
-            <input type="url" id="sheetDocUrl" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off" spellcheck="false">
-          </label>
-        </div>
+      <div class="sheet-status" id="sheetBox">
+        <span class="tiny status" id="sheetStatus"></span>
+        <label class="admin-key">관리 키 <input type="password" id="adminKey" autocomplete="off" spellcheck="false" placeholder="학생 추가·수정·삭제용"></label>
+        <button type="button" class="btn small" id="adminKeySave">저장</button>
       </div>
 
       <div class="pmode-bar">
@@ -234,6 +215,6 @@
   <option value="중1"><option value="중2"><option value="중3"><option value="고1"><option value="고2"><option value="고3">
 </datalist>
 
-<script src="app.js?v=20261118z"></script>
+<script src="app.js?v=20261119a"></script>
 </body>
 </html>
