@@ -8,7 +8,7 @@
   // 저장된 화면 모드를 먼저 적용해 깜빡임 방지
   try { var t = localStorage.getItem('wordTest.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
 </script>
-<link rel="stylesheet" href="style.css?v=20261119e">
+<link rel="stylesheet" href="style.css?v=20261119f">
 </head>
 <body>
 <div class="layout">
@@ -91,6 +91,7 @@
             <div class="head-btns">
               <button type="button" class="btn small admin-only" id="stuAdd" hidden>＋ 학생 추가</button>
               <button type="button" class="btn small primary" id="recordSel" hidden title="체크한 학생의 점수를 기록 (빈칸은 통과)">✓ 선택 학생 기록</button>
+              <button type="button" class="btn small" id="printSheet" title="지금 보이는 학년의 진도표를 A4 가로로 인쇄">🖨 진도표</button>
               <button type="button" class="btn small" id="progRefresh">↻ 새로고침</button>
               <button type="button" class="btn small" id="progNone">선택 해제</button>
             </div>
@@ -220,6 +221,7 @@
   <option value="중1"><option value="중2"><option value="중3"><option value="고1"><option value="고2"><option value="고3">
 </datalist>
 
-<script src="app.js?v=20261119e"></script>
+<script src="app.js?v=20261119f"></script>
+<div id="sheetPrint" class="sheet-print"></div>
 </body>
 </html>

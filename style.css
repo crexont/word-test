@@ -355,3 +355,32 @@ body.view-prog.pmode-sheet .layout { grid-template-columns: minmax(0, 1fr); }
 .ptable .c-score { width: 86px; }
 .ptable .c-act { width: 106px; }
 @media (max-width: 960px) { .ptable { table-layout: auto; } }
+
+/* 진도표 인쇄 (A4 가로) */
+.sheet-print { display: none; }
+@page sheet { size: A4 landscape; margin: 8mm; }
+@media print {
+  body.print-sheet > *:not(.sheet-print) { display: none !important; }
+  body.print-sheet .sheet-print { display: block; color: #000; font-family: inherit; }
+  .sp-page { page: sheet; break-after: page; }
+  .sp-page:last-child { break-after: auto; }
+  .sp-head { display: flex; align-items: baseline; gap: 8px; margin: 0 0 3mm; font-size: 14pt; }
+  .sp-head span { font-size: 11pt; font-weight: 700; color: #1f3864; }
+  .sp-head em { margin-left: auto; font-style: normal; font-size: 8pt; color: #555; }
+  .sp-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 7pt; }
+  .sp-table col.sp-g { width: 9mm; }
+  .sp-table col.sp-b { width: 18mm; }
+  .sp-table col.sp-n { width: 16mm; }
+  .sp-table th, .sp-table td { border: 0.3pt solid #999; padding: 0; height: 5.6mm; text-align: center; vertical-align: middle; white-space: nowrap; overflow: hidden; }
+  .sp-table thead th { background: #1f3864; color: #fff; font-size: 7.5pt; }
+  .sp-table thead { display: table-header-group; }
+  .sp-table tbody { break-inside: avoid; border-top: 1.2pt solid #333; }
+  .sp-table tr { break-inside: avoid; }
+  .sp-table .sp-gc, .sp-table .sp-bc { font-weight: 700; font-size: 7.5pt; white-space: normal; }
+  .sp-table .sp-nc { font-size: 8.5pt; font-weight: 600; border-right: 1.2pt solid #333; }
+  .sp-table td.p1 { background: #d9ead3; }
+  .sp-table td.p2 { background: #93c47d; }
+  .sp-table td.out { background: #e7e7e7; }
+  .sp-table td sup { font-size: 5pt; }
+  .sp-table .b5 { border-right: 1pt solid #555; }
+}

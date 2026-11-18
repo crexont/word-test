@@ -1021,6 +1021,69 @@
     });
   }
 
+  // 진도표 인쇄 (A4 가로): 지금 보이는 학년의 학생들, Day 30개씩 끊어서 표로
+  function printSheet() {
+    if (!prog.data || !prog.data.rows.length) { setStatus('인쇄할 학생이 없습니다.', 'err'); return; }
+    var grades = gradeList();
+    var gf = grades.indexOf(prog.grade) >= 0 ? prog.grade : '';
+    var gidx = function (g) { var i = grades.indexOf(g); return i < 0 ? 99 : i; };
+    var rows = prog.data.rows.filter(function (r) { return !gf || r.grade === gf; })
+      .map(function (r, i) { return { r: r, i: i }; });
+    // 학년 → 교재(시트에 처음 나온 순서) → 시트 순서
+    var firstAt = {};
+    rows.forEach(function (x) { var k = x.r.grade + '|' + x.r.book; if (!(k in firstAt)) firstAt[k] = x.i; });
+    rows.sort(function (a, b) {
+      return gidx(a.r.grade) - gidx(b.r.grade) || firstAt[a.r.grade + '|' + a.r.book] - firstAt[b.r.grade + '|' + b.r.book] || a.i - b.i;
+    });
+    rows = rows.map(function (x) { return x.r; });
+    var units = prog.data.units.map(parseUnit).filter(Boolean).sort(function (x, y) { return x.a - y.a; });
+    var infos = rows.map(studentInfo);
+    // 실제로 쓰는 범위까지만 (교재 최대 Day 중 가장 큰 값)
+    var maxAll = infos.reduce(function (m, st) { return Math.max(m, bookMaxDay(st.book) || 0); }, 0);
+    if (maxAll) units = units.filter(function (u) { return u.a <= maxAll; });
+    var chunks = [];
+    for (var i = 0; i < units.length; i += 30) chunks.push(units.slice(i, i + 30));
+    var today = formatDate(todayStr());
+    var html = '';
+    chunks.forEach(function (ch, ci) {
+      html += '<section class="sp-page">' +
+        '<div class="sp-head"><b>VOCA 진도표</b>' + (gf ? ' <span>' + esc(gf) + '</span>' : '') +
+        ' <span>Day ' + ch[0].a + '–' + ch[ch.length - 1].b + '</span>' +
+        '<em>' + esc(today) + ' · 초록 = 통과(날짜) · 진초록 = 2회독 이상</em></div>' +
+        '<table class="sp-table"><colgroup><col class="sp-g"><col class="sp-b"><col class="sp-n">' +
+        ch.map(function () { return '<col>'; }).join('') + '</colgroup><thead><tr><th>학년</th><th>교재</th><th>이름</th>' +
+        ch.map(function (u) { return '<th' + (u.b % 5 ? '' : ' class="b5"') + '>' + esc(u.label) + '</th>'; }).join('') + '</tr></thead>';
+      var k = 0;
+      while (k < rows.length) {
+        var e = k;
+        while (e + 1 < rows.length && rows[e + 1].grade === rows[k].grade && rows[e + 1].book === rows[k].book) e++;
+        html += '<tbody>';
+        for (var j = k; j <= e; j++) {
+          var row = rows[j], st = infos[j], max = bookMaxDay(st.book);
+          html += '<tr>' + (j === k ? '<td rowspan="' + (e - k + 1) + '" class="sp-gc">' + esc(row.grade || '') + '</td>' +
+            '<td rowspan="' + (e - k + 1) + '" class="sp-bc">' + esc(st.book ? (st.book.short || st.book.title) : row.book) + '</td>' : '') +
+            '<td class="sp-nc">' + esc(row.name) + '</td>' +
+            ch.map(function (u) {
+              var b5 = u.b % 5 ? '' : ' b5';
+              if (max && u.a > max) return '<td class="out' + b5 + '"></td>';
+              var ps = passesOf(row, u);
+              if (!ps.length) return b5 ? '<td class="b5"></td>' : '<td></td>';
+              return '<td class="' + (ps.length > 1 ? 'p2' : 'p1') + b5 + '">' + esc(ps[ps.length - 1]) + (ps.length > 1 ? '<sup>' + ps.length + '</sup>' : '') + '</td>';
+            }).join('') + '</tr>';
+        }
+        html += '</tbody>';
+        k = e + 1;
+      }
+      html += '</table></section>';
+    });
+    var box = $('sheetPrint');
+    box.innerHTML = html;
+    document.body.classList.add('print-sheet');
+    var done = function () { document.body.classList.remove('print-sheet'); box.innerHTML = ''; window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    window.print();
+  }
+
   // 재시험 표시: 마지막 기록이 '재시험'이고 그 범위가 지금 다음 범위와 같으면
   function retestBadge(row, st) {
     var lg = row.log;
@@ -1285,6 +1348,7 @@
     $('adminKey').addEventListener('keydown', function (e) { if (e.key === 'Enter') saveAdminKey(); });
     $('progRefresh').addEventListener('click', loadSheet);
     $('recordSel').addEventListener('click', recordSelected);
+    $('printSheet').addEventListener('click', printSheet);
     $('progPass').value = lsGet('wordTest.passRate') || '90';
     $('progPass').addEventListener('change', function () { lsSet('wordTest.passRate', String(passRate())); });
     $('progNone').addEventListener('click', function () { prog.selected.clear(); renderProgList(); renderBatchSoon(); });
