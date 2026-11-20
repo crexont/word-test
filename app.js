@@ -840,6 +840,13 @@
         if (c[0] !== c[1]) { fail++; console.error('selftest 칸 계산 ' + i + ': ' + c[0] + ', 기대 ' + c[1]); }
       });
       if (!/^\d{1,2}\/\d{1,2}$/.test(todayMD())) { fail++; console.error('selftest todayMD: ' + todayMD()); }
+      // 같은 교재에 같은 이름이 둘: 두 번째 학생은 두 번째 줄로 찾아야 함
+      var savedSheet = prog.sheetRows;
+      prog.data.rows = [{ r: 3, name: '동명', book: '점검', cells: {} }, { r: 4, name: '동명', book: '점검', cells: {} }];
+      prog.sheetRows = JSON.parse(JSON.stringify(prog.data.rows));
+      var who2 = whoOf(prog.data.rows[1]);
+      if (findRow(who2).r !== 4 || sheetRow(who2).r !== 4) { fail++; console.error('selftest 동명이인: 두 번째 학생을 못 찾음'); }
+      prog.sheetRows = savedSheet;
     } catch (e) {
       fail++; console.error('selftest 오류: ' + e.message);
     } finally {
@@ -888,11 +895,12 @@
     $('progRefresh').disabled = true;
     return api('GET').then(function (j) {
       // 체크한 학생은 이름+교재로 다시 찾는다 (학생 추가·삭제로 행 번호가 바뀌어도 같은 학생 유지)
-      var selKeys = prog.data ? prog.data.rows.filter(function (x) { return prog.selected.has(x.r); }).map(whoKey) : [];
+      var oldRows = prog.data ? prog.data.rows : [];
+      var selWho = oldRows.filter(function (x) { return prog.selected.has(x.r); }).map(function (x) { return whoOf(x, oldRows); });
       prog.data = j;
       prog.sheetRows = JSON.parse(JSON.stringify(j.rows));
       prog.version = j.version || 1;
-      prog.selected = new Set(j.rows.filter(function (x) { return selKeys.indexOf(whoKey(x)) >= 0; }).map(function (x) { return x.r; }));
+      prog.selected = new Set(selWho.map(function (w) { return nthOf(j.rows, w); }).filter(Boolean).map(function (x) { return x.r; }));
       saveQ.forEach(function (job) { job.apply(); }); // 아직 저장 안 된 변경은 화면에 다시 얹는다
       if (!fromQueue) setStatus('연결됨 · ' + j.sheet + ' · 학생 ' + j.rows.length + '명', 'ok');
       $('sheetBox').classList.add('connected');
@@ -908,11 +916,17 @@
   // ---------- 저장 줄: 화면은 먼저 바꾸고, 시트 저장은 뒤에서 하나씩 ----------
   //  job: { label, apply(): 화면 데이터에 변경 얹기(다시 읽은 뒤에도 다시 부름), run(): 시트 저장 Promise, reload: 저장 뒤 다시 읽기 }
   var saveQ = [], saveRunning = false;
+  // 학생 찾기: 이름+교재, 같은 이름+교재가 여럿이면 그중 몇 번째인지(n)까지
   function whoKey(x) { return x.name + '|' + x.book; }
-  function findRow(who) { return prog.data.rows.find(function (x) { return whoKey(x) === whoKey(who); }) || null; }
+  function nthOf(rows, who) { return rows.filter(function (x) { return whoKey(x) === whoKey(who); })[who.n] || null; }
+  function whoOf(row, rows) {
+    var same = (rows || prog.data.rows).filter(function (x) { return whoKey(x) === whoKey(row); });
+    return { name: row.name, book: row.book, n: Math.max(0, same.indexOf(row)) };
+  }
+  function findRow(who) { return nthOf(prog.data.rows, who); }
   // 시트에 실제로 있는 줄 (행 번호·이름은 이것으로 보낸다)
   function sheetRow(who) {
-    var x = prog.sheetRows.find(function (y) { return whoKey(y) === whoKey(who); });
+    var x = nthOf(prog.sheetRows, who);
     if (!x) throw new Error('시트에서 ' + who.name + ' 학생을 찾지 못했습니다.');
     return x;
   }
@@ -933,10 +947,12 @@
       return job.reload ? loadSheet(true) : renderProgList();
     }).then(function () { nextSave(job.label); }, function (err) {
       saveQ = []; // 남은 변경은 버리고 시트의 실제 상태로 되돌린다
-      loadSheet(true).catch(function () { /* 상태 줄은 아래에서 */ }).then(function () {
-        saveRunning = false;
-        setStatus('저장 실패: ' + job.label + ' — ' + err.message + ' (화면을 시트 상태로 되돌렸습니다)', 'err');
-      });
+      loadSheet(true).then(function () { return '화면을 시트 상태로 되돌렸습니다'; }, function () { return '시트를 다시 읽지 못했습니다. ↻ 를 눌러 확인하세요'; })
+        .then(function (after) {
+          saveRunning = false;
+          setStatus('저장 실패: ' + job.label + ' — ' + err.message + ' (' + after + ')', 'err');
+          if (saveQ.length) nextSave(); // 되돌리는 동안 새로 누른 것은 저장
+        });
     });
   }
   window.addEventListener('beforeunload', function (e) {
@@ -1015,7 +1031,7 @@
         html += '<tr class="' + (on ? 'on' : '') + '">' +
           '<td class="c-chk"><input type="checkbox" data-r="' + row.r + '"' + (on ? ' checked' : '') + (st.book && st.next ? lock : ' disabled') + '></td>' +
           '<td class="c-name">' + esc(row.name) + (row.pending ? '<span class="note">저장 중</span>' : '') + (st.round > 1 ? '<span class="round">' + st.round + '회독</span>' : '') + (retestOf(row, st) ? '<span class="retest" title="재시험 ' + esc(retestOf(row, st)) + '">재 ' + esc(retestOf(row, st)) + '</span>' : '') + (row.note ? '<span class="note" title="' + esc(row.note) + '">' + esc(row.note) + '</span>' : '') + '</td>' +
-          '<td class="c-cnt"><select data-cnt="' + row.r + '" title="이번에 볼 Day 수"' + (st.book ? '' : ' disabled') + '>' + cntOpts + '</select><span class="lbl">개</span></td>' +
+          '<td class="c-cnt"><select data-cnt="' + row.r + '" title="이번에 볼 Day 수"' + (st.book ? lock : ' disabled') + '>' + cntOpts + '</select><span class="lbl">개</span></td>' +
           '<td class="c-next"><span class="lbl">다음</span> <b>' + esc(nextTxt) + '</b></td>' +
           '<td class="c-last" title="' + esc(lastTxt) + '"><span class="lbl">최근</span> ' + esc(lastTxt) + '</td>' +
           '<td class="c-prog"><span class="bar"><i style="width:' + (st.total ? Math.round(st.done / st.total * 100) : 0) + '%"></i></span> ' + st.done + '/' + st.total + '</td>' +
@@ -1047,7 +1063,7 @@
         var g = groups[+cb.getAttribute('data-group')];
         g.rows.forEach(function (row) {
           var st = studentInfo(row);
-          if (cb.checked && st.book && st.next) prog.selected.add(row.r); else prog.selected.delete(row.r);
+          if (cb.checked && st.book && st.next && !row.pending) prog.selected.add(row.r); else prog.selected.delete(row.r);
         });
         renderProgList(); renderBatchSoon();
       });
@@ -1089,7 +1105,7 @@
     var range = st.last && st.last.range;
     if (!range) return;
     if (!confirm(row.name + ' — Day ' + range.label + ' 통과 기록(' + st.last.date + ')을 지울까요?')) return;
-    var who = { name: row.name, book: row.book };
+    var who = whoOf(row);
     queueSave({
       label: row.name + ' Day ' + range.label + ' 통과 지움',
       apply: function () {
@@ -1172,7 +1188,7 @@
   // 통과(pass) / 재시험 표시 / 재시험 표시 지우기(clear)
   function recordJob(row, st, pass, clear) {
     if (!st.next) return;
-    var who = { name: row.name, book: row.book }, next = st.next, date = todayMD();
+    var who = whoOf(row), next = st.next, date = todayMD();
     queueSave({
       label: row.name + ' Day ' + next.label + (pass ? ' 통과' : clear ? ' 재시험 표시 지움' : ' 재시험'),
       apply: function () {
@@ -1183,11 +1199,7 @@
       },
       run: function () {
         var s = sheetRow(who);
-        return api('POST', { action: 'record', r: s.r, name: s.name, units: next.units, range: next.label, pass: pass, clear: clear })
-          .then(function (j) {
-            var x = findRow(who);
-            if (x) Object.keys(j.values || {}).forEach(function (k) { x.cells[k] = j.values[k]; });
-          });
+        return api('POST', { action: 'record', r: s.r, name: s.name, units: next.units, range: next.label, pass: pass, clear: clear });
       }
     });
   }
@@ -1349,7 +1361,7 @@
       });
       return;
     }
-    var who = { name: editing.name, book: editing.book };
+    var who = whoOf(editing);
     queueSave({
       label: who.name + ' 수정', reload: true,
       apply: function () {
@@ -1365,7 +1377,7 @@
   function deleteStudent() {
     if (!editing) return;
     if (!confirm(editing.name + ' 학생을 진도표에서 삭제할까요? 그 학생의 통과 기록도 함께 지워집니다.')) return;
-    var who = { name: editing.name, book: editing.book };
+    var who = whoOf(editing);
     $('stuDlg').close();
     queueSave({
       label: who.name + ' 삭제', reload: true,
