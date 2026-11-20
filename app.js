@@ -686,7 +686,7 @@
     selected: new Set(), // 체크한 학생의 행 번호(r)
     bookCache: {},       // 교재 id → 교재 데이터
     qcache: {},          // 학생별 문항 (다시 섞기 전까지 유지)
-    busy: false
+    sheetRows: []        // 마지막으로 시트에서 읽은 그대로의 학생 줄 (저장 요청의 행 번호용)
   };
   var view = 'gen';
 
@@ -745,12 +745,20 @@
 
   // 칸 하나에 적힌 통과 날짜들 ("11/18, 2/3" → ['11/18', '2/3'])
   //  '재11/18' 은 재시험 표시라 통과 날짜로 세지 않음
-  function partsOf(row, u) {
-    return String(row.cells[u.label] || '').split(/[,\n]/).map(function (s) { return s.trim(); }).filter(Boolean);
-  }
+  function partsOf(row, u) { return splitCell(row.cells[u.label]); }
   function passesOf(row, u) {
     return partsOf(row, u).filter(function (s) { return s.charAt(0) !== '재'; });
   }
+  // 시트에 저장하기 전에 화면에 먼저 보일 칸 값 (Code.gs의 record_ / set_ clear와 같은 규칙)
+  function todayMD() { var d = new Date(); return (d.getMonth() + 1) + '/' + d.getDate(); }
+  function splitCell(v) { return String(v || '').split(/[,\n]/).map(function (s) { return s.trim(); }).filter(Boolean); }
+  function cellAfterRecord(value, pass, clear, date) {
+    var parts = splitCell(value).filter(function (s) { return s.charAt(0) !== '재'; });
+    if (pass) parts.push(date); else if (!clear) parts.push('재' + date);
+    return parts.join(', ');
+  }
+  function cellAfterUndo(value) { var parts = splitCell(value); parts.pop(); return parts.join(', '); }
+
   // 다음 범위에 재시험 표시가 있으면 그 날짜 ('11/18'), 없으면 ''
   function retestOf(row, st) {
     if (!st.next) return '';
@@ -823,6 +831,17 @@
       check('중간 빈칸', { 1: '11/1', 3: '11/1' }, { next: '2', done: 2 });
       check('1회독 끝', { 1: '11/1', 2: '11/1', 3: '11/1', 4: '11/1' }, { next: '1-2', round: 2, done: 0, last: '1-4@11/1' });
       check('2회독 중', { 1: '11/1, 11/9', 2: '11/1, 11/9', 3: '11/1', 4: '11/1' }, { next: '3-4', round: 2, done: 2, last: '1-2@11/9' });
+      [[cellAfterRecord('', true, false, '11/20'), '11/20'],
+       [cellAfterRecord('11/1, 재11/5', true, false, '11/20'), '11/1, 11/20'],
+       [cellAfterRecord('11/1', false, false, '11/20'), '11/1, 재11/20'],
+       [cellAfterRecord('재11/5', false, true, '11/20'), ''],
+       [cellAfterUndo('11/1, 11/9'), '11/1'],
+       [cellAfterUndo('11/1'), '']].forEach(function (c, i) {
+        if (c[0] !== c[1]) { fail++; console.error('selftest 칸 계산 ' + i + ': ' + c[0] + ', 기대 ' + c[1]); }
+      });
+      if (!/^\d{1,2}\/\d{1,2}$/.test(todayMD())) { fail++; console.error('selftest todayMD: ' + todayMD()); }
+    } catch (e) {
+      fail++; console.error('selftest 오류: ' + e.message);
     } finally {
       prog.data = saved.data; state.books = saved.books; $('progDefault').value = saved.dflt;
     }
@@ -861,25 +880,68 @@
   }
 
 
-  function loadSheet() {
+  // fromQueue: 저장 줄이 부른 다시 읽기. 그 밖의 다시 읽기는 저장 중이면 미룬다 (옛 값으로 화면을 덮지 않게)
+  function loadSheet(fromQueue) {
     if (!prog.url) { renderProgList(); return Promise.resolve(); }
-    setStatus('불러오는 중…');
+    if (!fromQueue && saveQ.length) { setStatus('저장 중 ' + saveQ.length + '건 — 끝난 뒤에 다시 불러오세요.'); return Promise.resolve(); }
+    if (!fromQueue) setStatus('불러오는 중…');
     $('progRefresh').disabled = true;
     return api('GET').then(function (j) {
+      // 체크한 학생은 이름+교재로 다시 찾는다 (학생 추가·삭제로 행 번호가 바뀌어도 같은 학생 유지)
+      var selKeys = prog.data ? prog.data.rows.filter(function (x) { return prog.selected.has(x.r); }).map(whoKey) : [];
       prog.data = j;
+      prog.sheetRows = JSON.parse(JSON.stringify(j.rows));
       prog.version = j.version || 1;
-      // 시트에서 사라진 학생은 선택 해제
-      var rs = new Set(j.rows.map(function (x) { return x.r; }));
-      prog.selected.forEach(function (r) { if (!rs.has(r)) prog.selected.delete(r); });
-      setStatus('연결됨 · ' + j.sheet + ' · 학생 ' + j.rows.length + '명', 'ok');
+      prog.selected = new Set(j.rows.filter(function (x) { return selKeys.indexOf(whoKey(x)) >= 0; }).map(function (x) { return x.r; }));
+      saveQ.forEach(function (job) { job.apply(); }); // 아직 저장 안 된 변경은 화면에 다시 얹는다
+      if (!fromQueue) setStatus('연결됨 · ' + j.sheet + ' · 학생 ' + j.rows.length + '명', 'ok');
       $('sheetBox').classList.add('connected');
       renderProgList();
       renderBatchSoon();
     }).catch(function (err) {
       setStatus('불러오지 못했습니다: ' + err.message, 'err');
       $('sheetBox').classList.remove('connected');
-    }).then(function () { $('progRefresh').disabled = false; });
+      if (fromQueue) throw err;
+    }).then(function () { $('progRefresh').disabled = false; }, function (err) { $('progRefresh').disabled = false; throw err; });
   }
+
+  // ---------- 저장 줄: 화면은 먼저 바꾸고, 시트 저장은 뒤에서 하나씩 ----------
+  //  job: { label, apply(): 화면 데이터에 변경 얹기(다시 읽은 뒤에도 다시 부름), run(): 시트 저장 Promise, reload: 저장 뒤 다시 읽기 }
+  var saveQ = [], saveRunning = false;
+  function whoKey(x) { return x.name + '|' + x.book; }
+  function findRow(who) { return prog.data.rows.find(function (x) { return whoKey(x) === whoKey(who); }) || null; }
+  // 시트에 실제로 있는 줄 (행 번호·이름은 이것으로 보낸다)
+  function sheetRow(who) {
+    var x = prog.sheetRows.find(function (y) { return whoKey(y) === whoKey(who); });
+    if (!x) throw new Error('시트에서 ' + who.name + ' 학생을 찾지 못했습니다.');
+    return x;
+  }
+  function queueSave(job) {
+    job.apply();
+    saveQ.push(job);
+    renderProgList(); renderBatchSoon();
+    if (!saveRunning) nextSave();
+    else setStatus('저장 중 ' + saveQ.length + '건…');
+  }
+  function nextSave(lastLabel) {
+    var job = saveQ[0];
+    if (!job) { saveRunning = false; setStatus('저장됨: ' + lastLabel, 'ok'); return; }
+    saveRunning = true;
+    setStatus('저장 중 ' + saveQ.length + '건… ' + job.label);
+    Promise.resolve().then(job.run).then(function () {
+      saveQ.shift();
+      return job.reload ? loadSheet(true) : renderProgList();
+    }).then(function () { nextSave(job.label); }, function (err) {
+      saveQ = []; // 남은 변경은 버리고 시트의 실제 상태로 되돌린다
+      loadSheet(true).catch(function () { /* 상태 줄은 아래에서 */ }).then(function () {
+        saveRunning = false;
+        setStatus('저장 실패: ' + job.label + ' — ' + err.message + ' (화면을 시트 상태로 되돌렸습니다)', 'err');
+      });
+    });
+  }
+  window.addEventListener('beforeunload', function (e) {
+    if (saveQ.length) { e.preventDefault(); e.returnValue = ''; }
+  });
 
   // 시트에 있는 학년 목록 (중1 → 고3 순서, 그 밖의 값은 뒤에)
   var GRADE_ORDER = ['초4', '초5', '초6', '중1', '중2', '중3', '고1', '고2', '고3'];
@@ -945,22 +1007,23 @@
       g.rows.forEach(function (row) {
         var st = studentInfo(row);
         var on = prog.selected.has(row.r);
+        var lock = row.pending ? ' disabled' : ''; // 추가·수정을 저장하는 중인 학생
         var nextTxt = !st.book ? '-' : st.next ? 'Day ' + st.next.label : (st.total ? '완료' : '-');
         var lastTxt = st.last ? 'Day ' + st.last.range.label + ' · ' + st.last.date + (st.last.round < st.round ? ' (' + st.last.round + '회독)' : '') : '기록 없음';
         var cntOpts = '';
         for (var n = 1; n <= 5; n++) cntOpts += '<option value="' + n + '"' + (n === st.count ? ' selected' : '') + '>' + n + '</option>';
         html += '<tr class="' + (on ? 'on' : '') + '">' +
-          '<td class="c-chk"><input type="checkbox" data-r="' + row.r + '"' + (on ? ' checked' : '') + (st.book && st.next ? '' : ' disabled') + '></td>' +
-          '<td class="c-name">' + esc(row.name) + (st.round > 1 ? '<span class="round">' + st.round + '회독</span>' : '') + (retestOf(row, st) ? '<span class="retest" title="재시험 ' + esc(retestOf(row, st)) + '">재 ' + esc(retestOf(row, st)) + '</span>' : '') + (row.note ? '<span class="note" title="' + esc(row.note) + '">' + esc(row.note) + '</span>' : '') + '</td>' +
+          '<td class="c-chk"><input type="checkbox" data-r="' + row.r + '"' + (on ? ' checked' : '') + (st.book && st.next ? lock : ' disabled') + '></td>' +
+          '<td class="c-name">' + esc(row.name) + (row.pending ? '<span class="note">저장 중</span>' : '') + (st.round > 1 ? '<span class="round">' + st.round + '회독</span>' : '') + (retestOf(row, st) ? '<span class="retest" title="재시험 ' + esc(retestOf(row, st)) + '">재 ' + esc(retestOf(row, st)) + '</span>' : '') + (row.note ? '<span class="note" title="' + esc(row.note) + '">' + esc(row.note) + '</span>' : '') + '</td>' +
           '<td class="c-cnt"><select data-cnt="' + row.r + '" title="이번에 볼 Day 수"' + (st.book ? '' : ' disabled') + '>' + cntOpts + '</select><span class="lbl">개</span></td>' +
           '<td class="c-next"><span class="lbl">다음</span> <b>' + esc(nextTxt) + '</b></td>' +
           '<td class="c-last" title="' + esc(lastTxt) + '"><span class="lbl">최근</span> ' + esc(lastTxt) + '</td>' +
           '<td class="c-prog"><span class="bar"><i style="width:' + (st.total ? Math.round(st.done / st.total * 100) : 0) + '%"></i></span> ' + st.done + '/' + st.total + '</td>' +
           '<td class="c-act">' +
-            '<button type="button" class="btn small pass" data-pass="' + row.r + '"' + (st.book && st.next && canWrite ? '' : ' disabled') + ' title="' + (st.next ? 'Day ' + esc(st.next.label) + ' 통과로 오늘 날짜 기록' : '') + '">통과 ✓</button>' +
-            (prog.version >= 13 ? '<button type="button" class="btn small retest-btn' + (retestOf(row, st) ? ' on' : '') + '" data-retest="' + row.r + '"' + (st.book && st.next ? '' : ' disabled') + ' title="' + (retestOf(row, st) ? '재시험 표시 지우기' : '다음 범위를 재시험으로 표시 (진도표 칸에 재+날짜)') + '">재시험</button>' : '') +
-            '<button type="button" class="btn small undo" data-undo="' + row.r + '"' + (st.last && canWrite ? '' : ' disabled') + ' title="마지막 통과 기록 지우기">↶</button>' +
-            (canAdmin ? '<button type="button" class="btn small edit" data-edit="' + row.r + '" title="학생 정보 수정·삭제">✎</button>' : '') +
+            '<button type="button" class="btn small pass" data-pass="' + row.r + '"' + (st.book && st.next && canWrite ? lock : ' disabled') + ' title="' + (st.next ? 'Day ' + esc(st.next.label) + ' 통과로 오늘 날짜 기록' : '') + '">통과 ✓</button>' +
+            (prog.version >= 13 ? '<button type="button" class="btn small retest-btn' + (retestOf(row, st) ? ' on' : '') + '" data-retest="' + row.r + '"' + (st.book && st.next ? lock : ' disabled') + ' title="' + (retestOf(row, st) ? '재시험 표시 지우기' : '다음 범위를 재시험으로 표시 (진도표 칸에 재+날짜)') + '">재시험</button>' : '') +
+            '<button type="button" class="btn small undo" data-undo="' + row.r + '"' + (st.last && canWrite ? lock : ' disabled') + ' title="마지막 통과 기록 지우기">↶</button>' +
+            (canAdmin ? '<button type="button" class="btn small edit" data-edit="' + row.r + '"' + lock + ' title="학생 정보 수정·삭제">✎</button>' : '') +
           '</td></tr>';
       });
       html += '</tbody></table></div>';
@@ -1004,14 +1067,13 @@
     });
     qsa('#progTable [data-retest]').forEach(function (b) {
       b.addEventListener('click', function () {
-        if (prog.busy) return;
         var row = prog.data.rows.find(function (x) { return x.r === +b.getAttribute('data-retest'); });
         var st = studentInfo(row);
         if (!st.next) return;
         if (retestOf(row, st)) {
           if (!confirm(row.name + ' — Day ' + st.next.label + ' 재시험 표시를 지울까요?')) return;
-          recordRows([{ row: row, st: st, pass: false, clear: true }]);
-        } else recordRows([{ row: row, st: st, pass: false }]);
+          recordJob(row, st, false, true);
+        } else recordJob(row, st, false, false);
       });
     });
     qsa('#progTable [data-undo]').forEach(function (b) {
@@ -1021,32 +1083,25 @@
 
   // 통과: 다음 범위의 칸 전부에 오늘 날짜 / 되돌리기: 마지막에 같은 날짜로 통과한 칸들을 지움
   function markPass(r, undo) {
-    if (prog.busy) return;
     var row = prog.data.rows.find(function (x) { return x.r === r; });
     var st = studentInfo(row);
-    if (!undo) { recordRows([{ row: row, st: st, pass: true }]); return; }
-    var range = undo ? (st.last && st.last.range) : st.next;
+    if (!undo) { recordJob(row, st, true, false); return; }
+    var range = st.last && st.last.range;
     if (!range) return;
-    if (undo && !confirm(row.name + ' — Day ' + range.label + ' 통과 기록(' + st.last.date + ')을 지울까요?')) return;
-    prog.busy = true;
-    setStatus((undo ? '기록 지우는 중… ' : '기록하는 중… ') + row.name + ' Day ' + range.label);
-    var lastValue = '';
-    // 칸마다 차례로 기록 (중간에 실패하면 거기서 멈추고 알림)
-    range.units.reduce(function (p, label) {
-      return p.then(function () {
-        return api('POST', { action: 'set', r: r, name: row.name, unit: label, clear: !!undo }).then(function (j) {
-          row.cells[label] = j.value;
-          lastValue = j.date || '';
-        });
-      });
-    }, Promise.resolve()).then(function () {
-      setStatus((undo ? '지움: ' : '통과 기록: ') + row.name + ' Day ' + range.label + (undo ? '' : ' (' + lastValue + ')'), 'ok');
-    }).catch(function (err) {
-      setStatus('기록하지 못했습니다: ' + err.message + ' — 새로고침해서 확인하세요.', 'err');
-    }).then(function () {
-      prog.busy = false;
-      renderProgList();
-      renderBatchSoon();
+    if (!confirm(row.name + ' — Day ' + range.label + ' 통과 기록(' + st.last.date + ')을 지울까요?')) return;
+    var who = { name: row.name, book: row.book };
+    queueSave({
+      label: row.name + ' Day ' + range.label + ' 통과 지움',
+      apply: function () {
+        var x = findRow(who);
+        if (x) range.units.forEach(function (u) { x.cells[u] = cellAfterUndo(x.cells[u]); });
+      },
+      run: function () {
+        var s = sheetRow(who);
+        return range.units.reduce(function (p, u) {
+          return p.then(function () { return api('POST', { action: 'set', r: s.r, name: s.name, unit: u, clear: true }); });
+        }, Promise.resolve());
+      }
     });
   }
 
@@ -1114,28 +1169,26 @@
     window.print();
   }
 
-  function recordRows(list) {
-    prog.busy = true;
-    var done = 0, fail = null;
-    setStatus('기록하는 중… 0/' + list.length);
-    list.reduce(function (p, x) {
-      return p.then(function () {
-        if (fail) return;
-        return api('POST', { action: 'record', r: x.row.r, name: x.row.name, units: x.st.next.units, range: x.st.next.label,
-          pass: !!x.pass, clear: !!x.clear })
+  // 통과(pass) / 재시험 표시 / 재시험 표시 지우기(clear)
+  function recordJob(row, st, pass, clear) {
+    if (!st.next) return;
+    var who = { name: row.name, book: row.book }, next = st.next, date = todayMD();
+    queueSave({
+      label: row.name + ' Day ' + next.label + (pass ? ' 통과' : clear ? ' 재시험 표시 지움' : ' 재시험'),
+      apply: function () {
+        var x = findRow(who);
+        if (!x) return;
+        next.units.forEach(function (u) { x.cells[u] = cellAfterRecord(x.cells[u], pass, clear, date); });
+        prog.selected.delete(x.r);
+      },
+      run: function () {
+        var s = sheetRow(who);
+        return api('POST', { action: 'record', r: s.r, name: s.name, units: next.units, range: next.label, pass: pass, clear: clear })
           .then(function (j) {
-            Object.keys(j.values || {}).forEach(function (k) { x.row.cells[k] = j.values[k]; });
-            prog.selected.delete(x.row.r);
-            done++;
-            setStatus('기록하는 중… ' + done + '/' + list.length);
-          }, function (err) { fail = err; });
-      });
-    }, Promise.resolve()).then(function () {
-      prog.busy = false;
-      var msg = fail ? ['기록하다 멈췄습니다: ' + fail.message, 'err']
-        : [(list[0].pass ? '통과 기록함: ' : list[0].clear ? '재시험 표시 지움: ' : '재시험 표시함: ') + list.map(function (x) { return x.row.name + ' Day ' + x.st.next.label; }).join(', '), 'ok'];
-      // 시트를 다시 불러온 뒤 결과 문구를 보여 줌
-      loadSheet().then(function () { setStatus(msg[0], msg[1]); });
+            var x = findRow(who);
+            if (x) Object.keys(j.values || {}).forEach(function (k) { x.cells[k] = j.values[k]; });
+          });
+      }
     });
   }
 
@@ -1287,28 +1340,41 @@
   function saveStudent() {
     var grade = $('stuGrade').value.trim(), book = $('stuBook').value, name = $('stuName').value.trim(), note = $('stuNote').value.trim();
     if (!name) { stuBusy(false, '이름을 적어 주세요.'); return; }
-    stuBusy(true);
-    var req = editing
-      ? { action: 'updateStudent', r: editing.r, name: editing.name, set: { grade: grade, book: book, name: name, note: note } }
-      : { action: 'addStudent', grade: grade, book: book, name: name, note: note };
-    setStatus((editing ? '수정하는 중… ' : '추가하는 중… ') + name);
-    adminCall(req).then(function () {
-      $('stuDlg').close();
-      setStatus((editing ? '수정함: ' : '추가함: ') + name, 'ok');
-      loadSheet();
-    }).catch(function (err) { stuBusy(false, err.message); }).then(function () { stuBusy(false); });
+    $('stuDlg').close();
+    if (!editing) {
+      queueSave({
+        label: name + ' 추가', reload: true,
+        apply: function () { prog.data.rows.push({ r: 0, pending: true, grade: grade, book: book, name: name, note: note, cells: {} }); },
+        run: function () { return adminCall({ action: 'addStudent', grade: grade, book: book, name: name, note: note }); }
+      });
+      return;
+    }
+    var who = { name: editing.name, book: editing.book };
+    queueSave({
+      label: who.name + ' 수정', reload: true,
+      apply: function () {
+        var x = findRow(who);
+        if (x) { x.grade = grade; x.book = book; x.name = name; x.note = note; x.pending = true; }
+      },
+      run: function () {
+        var s = sheetRow(who);
+        return adminCall({ action: 'updateStudent', r: s.r, name: s.name, set: { grade: grade, book: book, name: name, note: note } });
+      }
+    });
   }
   function deleteStudent() {
     if (!editing) return;
     if (!confirm(editing.name + ' 학생을 진도표에서 삭제할까요? 그 학생의 통과 기록도 함께 지워집니다.')) return;
-    stuBusy(true);
-    var name = editing.name;
-    adminCall({ action: 'deleteStudent', r: editing.r, name: name }).then(function () {
-      prog.selected.delete(editing.r);
-      $('stuDlg').close();
-      setStatus('삭제함: ' + name, 'ok');
-      loadSheet();
-    }).catch(function (err) { stuBusy(false, err.message); }).then(function () { stuBusy(false); });
+    var who = { name: editing.name, book: editing.book };
+    $('stuDlg').close();
+    queueSave({
+      label: who.name + ' 삭제', reload: true,
+      apply: function () {
+        var x = findRow(who);
+        if (x) { prog.data.rows.splice(prog.data.rows.indexOf(x), 1); prog.selected.delete(x.r); }
+      },
+      run: function () { var s = sheetRow(who); return adminCall({ action: 'deleteStudent', r: s.r, name: s.name }); }
+    });
   }
 
   function setView(v) {
@@ -1337,7 +1403,7 @@
     });
     $('adminKeySave').addEventListener('click', saveAdminKey);
     $('adminKey').addEventListener('keydown', function (e) { if (e.key === 'Enter') saveAdminKey(); });
-    $('progRefresh').addEventListener('click', loadSheet);
+    $('progRefresh').addEventListener('click', function () { loadSheet(); });
     $('printSheet').addEventListener('click', printSheet);
     $('progNone').addEventListener('click', function () { prog.selected.clear(); renderProgList(); renderBatchSoon(); });
     $('progShuffle').addEventListener('click', function () { renderBatchSoon(true); });
