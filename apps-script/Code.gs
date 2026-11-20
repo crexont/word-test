@@ -16,8 +16,8 @@
 // 진도표가 있는 시트(탭) 이름. 비워 두면 첫 번째 시트를 씁니다.
 var SHEET_NAME = '';
 
-// 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭, 6: 관리 기능 안정화, 7: 서식 유지, 8: 교재 색을 사이트에서 지정, 9: 시트 보기 좋게)
-var VERSION = 13;
+// 사이트가 이 값을 보고 기능을 맞춥니다 (3: 회독 — 날짜를 이어서 적기, 4: 관리 기능, 5: 단어장 탭, 6: 관리 기능 안정화, 7: 서식 유지, 8: 교재 색을 사이트에서 지정, 9: 시트 보기 좋게, 14: 표 아래 줄·직접 만든 조건부 서식 유지)
+var VERSION = 14;
 
 // 진도표 '교재' 칸 색 (교재 약칭 기준, 띄어쓰기 무시). 여기 없는 교재는 원래 칠해 둔 색을 유지합니다.
 var BOOK_COLORS = {
@@ -35,8 +35,6 @@ var UNIT_RE = /^\d+\s*[-~]\s*\d+$|^\d+$/;
 
 function doGet(e) {
   return run_(function () {
-    var p = (e && e.parameter) || {};
-    if (p.action === 'book') return book_(p.tab);
     return list_();
   });
 }
@@ -101,7 +99,6 @@ function list_() {
   var values = sh.getDataRange().getDisplayValues();
   var L = layout_(values);
   var rows = [], book = '', grade = '';
-  var logs = lastLogs_();
   for (var r = L.firstDataRow; r < values.length; r++) {
     var row = values[r];
     if (L.iGrade >= 0 && String(row[L.iGrade]).trim()) grade = String(row[L.iGrade]).trim();
@@ -110,7 +107,7 @@ function list_() {
     if (!name) continue;
     var cells = {};
     L.units.forEach(function (u) { cells[u.label] = String(row[u.col] || '').trim(); });
-    rows.push({ r: r + 1, log: logs[name + '|' + book.replace(/\s+/g, '')] || null, grade: grade, book: book, name: name, note: L.iNote >= 0 ? String(row[L.iNote] || '').trim() : '', cells: cells });
+    rows.push({ r: r + 1, grade: grade, book: book, name: name, note: L.iNote >= 0 ? String(row[L.iNote] || '').trim() : '', cells: cells });
   }
   return { ok: true, version: VERSION, sheet: sh.getName(), units: L.units.map(function (u) { return u.label; }), rows: rows };
 }
@@ -197,7 +194,9 @@ function table_(sh) {
     v[L.iName] = name;
     rows.push({ r: i + 1, grade: L.iGrade >= 0 ? g : '', book: b, name: name, v: v });
   }
-  return { L: L, first: L.firstDataRow + 1, W: W, rows: rows };
+  // last: 마지막 학생 줄(1-base). 이 아래(표 밖 메모 등)는 다시 쓸 때 건드리지 않는다
+  var last = rows.length ? rows[rows.length - 1].r : L.firstDataRow;
+  return { L: L, first: L.firstDataRow + 1, last: last, W: W, rows: rows };
 }
 
 function findIdx_(T, req) {
@@ -243,9 +242,9 @@ function setRow_(T, row, grade, book) {
 // 표 전체 다시 쓰기 + 병합 + Day 칸 텍스트 형식 + 교재 범위 밖 회색
 function writeTable_(sh, T, maxDays) {
   var L = T.L, n = T.rows.length, W = T.W;
-  var span = Math.max(sh.getMaxRows() - T.first + 1, n);
+  var span = Math.max(T.last - T.first + 1, n, 1);
   if (sh.getMaxRows() < T.first + n - 1) sh.insertRowsAfter(sh.getMaxRows(), T.first + n - 1 - sh.getMaxRows());
-  // 머리글 아래 데이터 영역 전체를 한 번에 정리 (병합을 모두 포함하므로 "일부 병합" 오류가 나지 않음)
+  // 머리글 아래 ~ 마지막 학생 줄을 한 번에 정리 (학년·교재 병합은 이 안에만 있으므로 "일부 병합" 오류가 나지 않음)
   var area = sh.getRange(T.first, 1, span, W);
 
   // 다시 쓰기 전에 학년·교재 칸 색을 묶음별로 기억 (색이 줄 위치가 아니라 묶음을 따라가도록)
@@ -392,12 +391,17 @@ function styleSheet_(sh, T) {
 function passColors_(sh, T) {
   var L = T.L, n = T.rows.length;
   if (!L.units.length || !n) return;
-  var block = sh.getRange(T.first, L.units[0].col + 1, n, L.units[L.units.length - 1].col - L.units[0].col + 1);
-  sh.setConditionalFormatRules([
+  var c0 = L.units[0].col + 1;
+  var block = sh.getRange(T.first, c0, n, L.units[L.units.length - 1].col - L.units[0].col + 1);
+  // 선생님이 따로 만든 규칙은 남기고, 이 함수가 예전에 만든 규칙(Day 칸 왼쪽 위에서 시작)만 바꾼다
+  var others = sh.getConditionalFormatRules().filter(function (rule) {
+    return !rule.getRanges().some(function (g) { return g.getRow() === T.first && g.getColumn() === c0; });
+  });
+  sh.setConditionalFormatRules(others.concat([
     SpreadsheetApp.newConditionalFormatRule().whenTextContains('재').setBackground('#f4cccc').setFontColor('#990000').setRanges([block]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenTextContains(',').setBackground('#93c47d').setRanges([block]).build(),
     SpreadsheetApp.newConditionalFormatRule().whenCellNotEmpty().setBackground('#d9ead3').setRanges([block]).build()
-  ]);
+  ]));
 }
 
 var ADMIN_ACTIONS = {
@@ -448,77 +452,10 @@ var ADMIN_ACTIONS = {
       return { ok: true };
     });
   },
-  // { r, name(확인용), unit, value } — 날짜 칸을 원하는 값으로 (빈 값이면 지움)
-  setCell: function (req) {
-    return withLock_(function () {
-      var sh = sheet_(), T = table_(sh);
-      var row = T.rows[findIdx_(T, req)];
-      var u = T.L.units.filter(function (x) { return x.label === norm_(req.unit); })[0];
-      if (!u) throw new Error('Day 칸을 찾지 못했습니다: ' + req.unit);
-      var cell = sh.getRange(row.r, u.col + 1);
-      if (String(req.value || '').trim()) cell.setNumberFormat('@').setValue(String(req.value).trim()); else cell.clearContent();
-      return { ok: true };
-    });
-  },
   // { maxDays? } — 표 다시 정리 (이름 없는 줄 제거, 병합·회색 칸 다시 맞춤)
   tidy: function (req) {
     return withLock_(function () { var sh = sheet_(); writeTable_(sh, table_(sh), req.maxDays); return { ok: true }; });
   }
-};
-
-// =====================================================================
-// 단어장 탭 (교재마다 탭 하나: Day | 영어 | 뜻 | 단원 이름)
-//  - Day 칸이 숫자가 아니면(예: 부록1) 부록 단원으로 보고, 숫자 Day 뒤에 차례로 붙입니다.
-//  - '단원 이름'은 부록처럼 이름이 있는 단원에만 적으면 됩니다.
-// =====================================================================
-
-function book_(tab) {
-  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(String(tab || ''));
-  if (!sh) throw new Error('단어장 탭을 찾지 못했습니다: ' + tab);
-  var v = sh.getDataRange().getDisplayValues();
-  var head = (v[0] || []).map(function (x) { return norm_(x).toLowerCase(); });
-  var iD = head.indexOf('day'), iE = head.indexOf('영어'), iK = head.indexOf('뜻'), iN = head.indexOf('단원이름');
-  if (iD < 0 || iE < 0 || iK < 0) throw new Error("단어장 탭 첫 줄은 'Day | 영어 | 뜻' 이어야 합니다: " + tab);
-  var units = [], byKey = {};
-  for (var r = 1; r < v.length; r++) {
-    var d = String(v[r][iD] || '').trim(), en = String(v[r][iE] || '').trim(), ko = String(v[r][iK] || '').trim();
-    if (!d || !en) continue;
-    if (!byKey[d]) { byKey[d] = { key: d, name: '', words: [] }; units.push(byKey[d]); }
-    if (iN >= 0 && !byKey[d].name && String(v[r][iN] || '').trim()) byKey[d].name = String(v[r][iN]).trim();
-    byKey[d].words.push([en, ko]);
-  }
-  var maxNum = 0;
-  units.forEach(function (u) { if (/^\d+$/.test(u.key)) maxNum = Math.max(maxNum, Number(u.key)); });
-  var extra = 0, days = [];
-  units.forEach(function (u) {
-    if (/^\d+$/.test(u.key)) days.push({ day: Number(u.key), words: u.words });
-    else { extra++; var o = { day: maxNum + extra, label: u.key, words: u.words }; if (u.name) o.name = u.name; days.push(o); }
-  });
-  days.sort(function (a, b) { return a.day - b.day; });
-  return { ok: true, tab: sh.getName(), days: days };
-}
-
-// 관리: { tab, rows: [[Day, 영어, 뜻, 단원 이름], ...] } — 탭을 새로 만들거나 내용을 통째로 바꿉니다.
-ADMIN_ACTIONS.importBook = function (req) {
-  return withLock_(function () {
-    var tab = String(req.tab || '').trim();
-    if (!/^단어_/.test(tab)) throw new Error("단어장 탭 이름은 '단어_'로 시작해야 합니다.");
-    var rows = req.rows || [];
-    if (!rows.length) throw new Error('올릴 단어가 없습니다.');
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sh = ss.getSheetByName(tab) || ss.insertSheet(tab, ss.getSheets().length);
-    sh.clear();
-    // =, +, -, @ 로 시작하는 글자는 수식으로 읽히지 않게 앞에 ' 를 붙인다 (화면에는 안 보임)
-    var safe = function (x) { x = String(x == null ? '' : x); return /^[=+\-@]/.test(x) ? "'" + x : x; };
-    var data = [['Day', '영어', '뜻', '단원 이름']].concat(rows.map(function (r) { return [safe(r[0]), safe(r[1]), safe(r[2]), safe(r[3] || '')]; }));
-    var rng = sh.getRange(1, 1, data.length, 4);
-    rng.setNumberFormat('@');
-    rng.setValues(data);
-    sh.setFrozenRows(1);
-    sh.getRange(1, 1, 1, 4).setFontWeight('bold').setBackground('#e8eef9');
-    sh.setColumnWidth(1, 60); sh.setColumnWidth(2, 170); sh.setColumnWidth(3, 420); sh.setColumnWidth(4, 260);
-    return { ok: true, tab: tab, rows: rows.length };
-  });
 };
 
 // =====================================================================
@@ -527,10 +464,10 @@ ADMIN_ACTIONS.importBook = function (req) {
 // =====================================================================
 var LOG_SHEET = '기록';
 
-function logSheet_(create) {
+function logSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var lg = ss.getSheetByName(LOG_SHEET);
-  if (!lg && create) {
+  if (!lg) {
     lg = ss.insertSheet(LOG_SHEET, 1);
     lg.getRange(1, 1, 1, 8).setValues([['날짜', '학년', '교재', '이름', '범위', '점수', '만점', '결과']])
       .setFontWeight('bold').setBackground('#1f3864').setFontColor('#ffffff').setHorizontalAlignment('center');
@@ -543,19 +480,6 @@ function logSheet_(create) {
     ]);
   }
   return lg;
-}
-
-// 학생별 마지막 기록 { '이름|교재': {date, range, score, total, result} }
-function lastLogs_() {
-  var lg = logSheet_(false), out = {};
-  if (!lg) return out;
-  var v = lg.getDataRange().getDisplayValues();
-  for (var i = 1; i < v.length; i++) {
-    var name = String(v[i][3] || '').trim(), book = String(v[i][2] || '').trim();
-    if (!name) continue;
-    out[name + '|' + book.replace(/\s+/g, '')] = { date: v[i][0], range: v[i][4], score: v[i][5], total: v[i][6], result: v[i][7] };
-  }
-  return out;
 }
 
 // req: { r, name, units: ['7','8'], range: '7-8', pass, clear }
@@ -582,7 +506,7 @@ function record_(req) {
     });
     if (!req.pass) passColors_(sh, T); // 예전 시트에도 재시험 색이 생기게
     if (!req.clear) {
-      logSheet_(true).appendRow([Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'), row.grade, row.book, row.name,
+      logSheet_().appendRow([Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm'), row.grade, row.book, row.name,
         'Day ' + String(req.range || ''), '', '', req.pass ? '통과' : '재시험']);
     }
     return { ok: true, date: date, values: values };

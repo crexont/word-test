@@ -94,20 +94,7 @@
   }
   // 선택한 Day의 단어(영어 단어 기준 중복 제거)
   function wordPool() {
-    if (!state.book) return [];
-    var seen = new Set(), pool = [];
-    state.book.days.forEach(function (d) {
-      if (!state.selected.has(d.day)) return;
-      d.words.forEach(function (w) {
-        var en = String(w[0] || '').trim(), ko = String(w[1] || '').trim();
-        if (!en) return;
-        var key = en.toLowerCase();
-        if (seen.has(key)) return;
-        seen.add(key);
-        pool.push({ en: en, ko: ko, day: d.day });
-      });
-    });
-    return pool;
+    return state.book ? poolFrom(state.book, state.selected) : [];
   }
 
   function radioValue(name) {
@@ -181,11 +168,6 @@
     var info = state.books.find(function (b) { return b.id === id; });
     if (!info) return Promise.resolve(false);
     qsa('.book-card').forEach(function (el, i) { el.classList.toggle('active', state.books[i].id === id); });
-    if (info.sheet && prog.url && !prog.bookCache[id]) {
-      $('emptyMsg').textContent = '단어장을 불러오는 중…';
-      $('emptyMsg').hidden = false;
-      $('previewArea').hidden = true;
-    }
     return getBookData(id).then(function (data) {
       var changed = state.bookId !== id;
       state.bookId = id;
@@ -209,7 +191,6 @@
       update();
       return true;
     }).catch(function (err) {
-      state.pendingBook = { id: id, days: restoreDays };
       if (view !== 'prog') {
         $('emptyMsg').textContent = bookErrorText(err);
         $('emptyMsg').hidden = false;
@@ -713,26 +694,12 @@
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 무시 */ } }
 
   // 교재 단어 데이터 (한 번 받으면 이 페이지에서는 다시 받지 않음)
-  //  - books.json에 sheet(구글 시트의 단어장 탭 이름)가 있으면 Apps Script에서 받는다 (단어는 공개 저장소에 없음)
-  //  - 없으면 file(JSON)에서 받는다
   var bookLoading = {};
   function getBookData(id) {
     if (prog.bookCache[id]) return Promise.resolve(prog.bookCache[id]);
     if (bookLoading[id]) return bookLoading[id];
     var info = state.books.find(function (b) { return b.id === id; });
-    var p;
-    if (info.sheet) {
-      if (!prog.url) return Promise.reject(new Error('NO_SHEET'));
-      p = fetch(prog.url + (prog.url.indexOf('?') >= 0 ? '&' : '?') + 'action=book&tab=' + encodeURIComponent(info.sheet))
-        .then(function (r) { if (!r.ok) throw new Error('시트 응답 오류 (' + r.status + ')'); return r.json(); })
-        .then(function (j) {
-          if (!j || j.ok === false) throw new Error((j && j.error) || '단어장을 읽지 못했습니다.');
-          return { title: info.title, days: j.days };
-        });
-    } else {
-      p = fetchJSON(info.file);
-    }
-    bookLoading[id] = p.then(function (d) {
+    bookLoading[id] = fetchJSON(info.file).then(function (d) {
       d.days.sort(function (a, b) { return a.day - b.day; });
       prog.bookCache[id] = d;
       delete bookLoading[id];
@@ -741,9 +708,7 @@
     return bookLoading[id];
   }
   function bookErrorText(err) {
-    return err.message === 'NO_SHEET'
-      ? '단어장은 구글 시트에 있습니다. 위쪽 "진도표" 탭에서 구글 시트를 먼저 연결하세요.'
-      : '교재 단어를 불러오지 못했습니다: ' + err.message;
+    return '교재 단어를 불러오지 못했습니다: ' + err.message;
   }
 
   // 시트의 '교재' 칸 → books.json의 교재 (약칭·이름·id, 띄어쓰기·괄호 무시)
@@ -833,6 +798,38 @@
     return { book: book, next: next, last: last, done: done, total: inRange.length, count: count, round: round };
   }
 
+  // 자체 점검: 주소 뒤에 ?selftest 를 붙여 열면 콘솔에 결과 (가짜 학생으로만 계산, 시트에는 쓰지 않음)
+  function selfTest() {
+    var saved = { data: prog.data, books: state.books, dflt: $('progDefault').value };
+    prog.data = { units: ['1', '2', '3', '4', '5'], rows: [] };
+    state.books = [{ id: 't', title: '점검용', short: '점검', maxDay: 4 }]; // Day 5는 범위 밖
+    $('progDefault').value = '2';
+    var fail = 0;
+    function check(name, cells, want) {
+      var row = { r: 1, book: '점검', name: '__selftest__', cells: cells };
+      var st = studentInfo(row);
+      var got = {
+        next: st.next ? st.next.label : '', round: st.round, done: st.done,
+        last: st.last ? st.last.range.label + '@' + st.last.date : '', retest: retestOf(row, st)
+      };
+      Object.keys(want).forEach(function (k) {
+        if (got[k] !== want[k]) { fail++; console.error('selftest ' + name + ': ' + k + ' = ' + got[k] + ', 기대 ' + want[k]); }
+      });
+    }
+    try {
+      check('처음', {}, { next: '1-2', round: 1, done: 0, last: '' });
+      check('1-2 통과', { 1: '11/1', 2: '11/1' }, { next: '3-4', done: 2, last: '1-2@11/1' });
+      check('재시험', { 1: '11/1', 2: '11/1', 3: '재11/5' }, { next: '3-4', retest: '11/5', last: '1-2@11/1' });
+      check('중간 빈칸', { 1: '11/1', 3: '11/1' }, { next: '2', done: 2 });
+      check('1회독 끝', { 1: '11/1', 2: '11/1', 3: '11/1', 4: '11/1' }, { next: '1-2', round: 2, done: 0, last: '1-4@11/1' });
+      check('2회독 중', { 1: '11/1, 11/9', 2: '11/1, 11/9', 3: '11/1', 4: '11/1' }, { next: '3-4', round: 2, done: 2, last: '1-2@11/9' });
+    } finally {
+      prog.data = saved.data; state.books = saved.books; $('progDefault').value = saved.dflt;
+    }
+    console.log('selftest: ' + (fail ? fail + '개 실패' : '모두 통과'));
+    return fail;
+  }
+
   function api(method, body) {
     if (!prog.url) return Promise.reject(new Error('구글 시트 주소가 없습니다.'));
     var opt = method === 'POST'
@@ -874,11 +871,7 @@
       // 시트에서 사라진 학생은 선택 해제
       var rs = new Set(j.rows.map(function (x) { return x.r; }));
       prog.selected.forEach(function (r) { if (!rs.has(r)) prog.selected.delete(r); });
-      if (prog.version < 3) {
-        setStatus('Apps Script를 새 버전으로 업데이트해야 통과를 기록할 수 있습니다 (예전 버전은 회독 날짜를 덮어씀). README의 "진도표(구글 시트) 연결" 2번을 다시 해 주세요.', 'err');
-      } else {
-        setStatus('연결됨 · ' + j.sheet + ' · 학생 ' + j.rows.length + '명', 'ok');
-      }
+      setStatus('연결됨 · ' + j.sheet + ' · 학생 ' + j.rows.length + '명', 'ok');
       $('sheetBox').classList.add('connected');
       renderProgList();
       renderBatchSoon();
@@ -1031,7 +1024,7 @@
     if (prog.busy) return;
     var row = prog.data.rows.find(function (x) { return x.r === r; });
     var st = studentInfo(row);
-    if (!undo && prog.version >= 12) { recordRows([{ row: row, st: st, pass: true }]); return; }
+    if (!undo) { recordRows([{ row: row, st: st, pass: true }]); return; }
     var range = undo ? (st.last && st.last.range) : st.next;
     if (!range) return;
     if (undo && !confirm(row.name + ' — Day ' + range.label + ' 통과 기록(' + st.last.date + ')을 지울까요?')) return;
@@ -1329,10 +1322,7 @@
       renderBatch();
     } else {
       $('testPages').innerHTML = ''; $('answerPages').innerHTML = '';
-      if (!state.book && state.pendingBook && prog.url) {
-        var pb = state.pendingBook; state.pendingBook = null;
-        loadBook(pb.id, pb.days);
-      } else if (state.book) update(); else {
+      if (state.book) update(); else {
         $('emptyMsg').textContent = '교재를 고르면 여기에 시험지 미리보기가 나타납니다.';
         $('emptyMsg').hidden = false;
         $('previewArea').hidden = true;
@@ -1476,6 +1466,7 @@
     fetchJSON('data/books.json').then(function (books) {
       state.books = Array.isArray(books) ? books : [];
       renderBooks();
+      if (/[?&]selftest\b/.test(location.search)) selfTest();
       setView(lsGet(VIEW_KEY) || 'gen');
       if (prog.url) loadSheet();
       var saved = sv.bookId && state.books.some(function (b) { return b.id === sv.bookId; }) ? sv.bookId : null;
