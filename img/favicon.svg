@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 학원 로고(해 + 구름)를 단순하게 줄인 북마크 아이콘 -->
+  <g stroke="#ef9f8b" stroke-width="4" stroke-linecap="round">
+    <path d="M14 6l3 7M31 3l-2 8M3 22l8 1"/>
+  </g>
+  <circle cx="22" cy="28" r="14" fill="#f2ae9e"/>
+  <path d="M17 54c-6 0-10-4-10-9s4-9 9-9c1-6 6-10 12-10 5 0 9 3 11 7 1-1 3-1 4-1 6 0 10 4 10 10v1c4 1 6 4 6 6 0 3-3 5-6 5z"
+        fill="#fff" stroke="#6f93dc" stroke-width="4.5" stroke-linejoin="round"/>
+</svg>

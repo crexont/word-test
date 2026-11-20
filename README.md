@@ -11,6 +11,8 @@
 |---|---|
 | `index.html`, `style.css`, `app.js` | 화면과 동작 |
 | `img/logo.png` | 시험지 왼쪽 위 학원 로고 (같은 이름으로 바꿔 넣으면 교체됨) |
+| `img/logo-header.png` | 화면 제목 옆 로고 (logo.png에서 바깥 흰 배경을 뺀 것) |
+| `img/favicon.svg`, `img/favicon.png` | 브라우저 탭·북마크 아이콘 (로고를 단순화한 것) |
 | `data/books.json` | 교재 목록 |
 | `data/<교재id>.json` | 교재별 Day·단어 데이터 |
 | `apps-script/Code.gs` | 진도표 구글 시트에 붙여 넣는 Apps Script |
